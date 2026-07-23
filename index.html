@@ -80,6 +80,13 @@
     .back-btn   { background:none; border:none; color:var(--muted); font-size:12px; cursor:pointer; margin-top:4px; letter-spacing:0.06em; }
     .nuevo-btn  { background:var(--surface); border:1px solid var(--border); color:var(--orange); border-radius:8px; padding:8px 14px; font-size:12px; cursor:pointer; font-weight:bold; }
 
+    /* FORMULARIO (RODEO) */
+    .form-wrap { padding:18px 22px; overflow-y:auto; }
+    .form-label { font-size:10px; color:var(--faint); text-transform:uppercase; letter-spacing:0.12em; display:block; margin-bottom:6px; }
+    .form-field { width:100%; padding:12px 14px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); font-size:15px; font-family:inherit; margin-bottom:16px; outline:none; }
+    .form-check-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; font-size:14px; }
+    .form-check-row input { width:20px; height:20px; flex-shrink:0; accent-color:var(--dark-teal); }
+
     ::-webkit-scrollbar { width:5px; }
     ::-webkit-scrollbar-track { background:transparent; }
     ::-webkit-scrollbar-thumb { background:#c8b89a; border-radius:3px; }
@@ -126,6 +133,13 @@
 
 <script>
   const URL_GS = "https://script.google.com/macros/s/AKfycbyUqWLiXTcw0o5cjRyrlZuR9Y-cmP2IHManoRFLUOgzo27vPGdTm-liw6-Sn3UM36s7/exec";
+
+  // Backend independiente del módulo "Proyecto Recuperación de Rodeo" (ver apps-script-rodeo.gs).
+  // TODO: reemplazar por la URL del Web App una vez deployado el Apps Script en la Google Sheet del módulo.
+  const URL_GS_RODEO = "PENDIENTE_DEPLOY";
+
+  const RODEO_DUENOS = ['Alfredo', 'Blanca', 'Natalia', 'Gissela', 'Etel', 'Lourdes'];
+  const RODEO_CLASIFICACIONES = ['Vaca', 'Vaquilla', 'Toro', 'Novillo', 'Novillito', 'Ternero', 'Ternera', 'Torito'];
 
   // ── ESTADO ─────────────────────────────────────────────────────────────────
   let S = {
@@ -204,7 +218,7 @@
     if (S.modulo === 'rodeo') {
       if (tabsNav)  tabsNav.style.display = 'none';
       if (hdrLabel) hdrLabel.textContent = 'Recuperación de Rodeo';
-      el.innerHTML = tplRodeoPlaceholder();
+      el.innerHTML = tplRodeoForm();
       return;
     }
 
@@ -240,16 +254,99 @@
       </div>`;
   }
 
-  // ── TEMPLATE: MÓDULO RODEO (PLACEHOLDER) ────────────────────────────────────
-  function tplRodeoPlaceholder() {
+  // ── TEMPLATE: MÓDULO RODEO — FORMULARIO DE INTERVENCIÓN ─────────────────────
+  function tplRodeoForm() {
+    const duenoOpts = RODEO_DUENOS.map(d => `<option value="${d}">${d}</option>`).join('');
+    const clasifOpts = RODEO_CLASIFICACIONES.map(c => `<option value="${c}">${c}</option>`).join('');
+
     return `
-      <div class="idle-screen">
-        <div style="text-align:center;max-width:280px;">
-          <div style="font-size:40px;margin-bottom:14px;">🤠</div>
-          <div style="font-size:15px;font-weight:bold;margin-bottom:8px;">Proyecto Recuperación de Rodeo</div>
-          <div style="font-size:13px;color:var(--muted);line-height:1.6;">Este módulo está en construcción. Muy pronto vas a poder registrar acá la información del proyecto.</div>
+      <div class="form-wrap">
+        <div style="max-width:420px;margin:0 auto;">
+          <div style="font-size:11px;color:var(--faint);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:18px;text-align:center;">Nuevo registro</div>
+
+          <label class="form-label" for="rodeo-caravana">Caravana</label>
+          <input type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1"
+            id="rodeo-caravana" class="form-field" placeholder="N.º de caravana">
+
+          <label class="form-label" for="rodeo-dueno">Dueño</label>
+          <select id="rodeo-dueno" class="form-field">
+            <option value="" disabled selected>Seleccione un dueño...</option>
+            ${duenoOpts}
+          </select>
+
+          <label class="form-label" for="rodeo-clasificacion">Clasificación</label>
+          <select id="rodeo-clasificacion" class="form-field">
+            <option value="" disabled selected>Seleccione una clasificación...</option>
+            ${clasifOpts}
+          </select>
+
+          <span class="form-label">Intervenciones</span>
+          <label class="form-check-row"><input type="checkbox" id="rodeo-vitamina"> Vitamina</label>
+          <label class="form-check-row"><input type="checkbox" id="rodeo-antip-interno"> Antiparasitario Interno</label>
+          <label class="form-check-row"><input type="checkbox" id="rodeo-antip-externo"> Antiparasitario Externo</label>
+
+          <label class="form-label" style="margin-top:6px;" for="rodeo-observaciones">Observaciones</label>
+          <textarea id="rodeo-observaciones" class="form-field act-textarea" rows="3" placeholder="Observaciones (opcional)"></textarea>
+
+          <button class="salida-btn" onclick="doGuardarRodeo()">Guardar Registro</button>
         </div>
       </div>`;
+  }
+
+  // ── ACCIONES: FORMULARIO RODEO ───────────────────────────────────────────────
+  async function doGuardarRodeo() {
+    const caravana      = document.getElementById('rodeo-caravana').value.trim();
+    const dueno         = document.getElementById('rodeo-dueno').value;
+    const clasificacion = document.getElementById('rodeo-clasificacion').value;
+
+    if (!caravana)      { flash('error', 'Ingresá el número de caravana'); return; }
+    if (!dueno)         { flash('error', 'Seleccioná un dueño'); return; }
+    if (!clasificacion) { flash('error', 'Seleccioná una clasificación'); return; }
+
+    if (URL_GS_RODEO === 'PENDIENTE_DEPLOY') {
+      flash('error', '⚠️ Backend del módulo aún no deployado — ver apps-script-rodeo.gs');
+      return;
+    }
+
+    const vitamina      = document.getElementById('rodeo-vitamina').checked;
+    const antipInterno  = document.getElementById('rodeo-antip-interno').checked;
+    const antipExterno  = document.getElementById('rodeo-antip-externo').checked;
+    const observaciones = document.getElementById('rodeo-observaciones').value.trim();
+
+    const params = new URLSearchParams({
+      action: 'save',
+      caravana,
+      dueno,
+      clasificacion,
+      vitamina: vitamina ? 'Sí' : 'No',
+      antiparasitario_interno: antipInterno ? 'Sí' : 'No',
+      antiparasitario_externo: antipExterno ? 'Sí' : 'No',
+      observaciones,
+    });
+
+    try {
+      const res  = await fetch(`${URL_GS_RODEO}?${params}`);
+      const data = await res.json();
+      if (data.success) {
+        flash('ok', '✓ Registro guardado correctamente');
+        limpiarFormularioRodeo();
+      } else {
+        flash('error', `Error al guardar: ${data.error || 'respuesta inesperada'}`);
+      }
+    } catch {
+      flash('error', 'Sin conexión — verifica tu internet');
+    }
+  }
+
+  function limpiarFormularioRodeo() {
+    document.getElementById('rodeo-caravana').value = '';
+    document.getElementById('rodeo-dueno').value = '';
+    document.getElementById('rodeo-clasificacion').value = '';
+    document.getElementById('rodeo-vitamina').checked = false;
+    document.getElementById('rodeo-antip-interno').checked = false;
+    document.getElementById('rodeo-antip-externo').checked = false;
+    document.getElementById('rodeo-observaciones').value = '';
+    document.getElementById('rodeo-caravana').focus();
   }
 
   // ── TEMPLATE: IDLE ─────────────────────────────────────────────────────────
