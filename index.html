@@ -135,8 +135,7 @@
   const URL_GS = "https://script.google.com/macros/s/AKfycbyUqWLiXTcw0o5cjRyrlZuR9Y-cmP2IHManoRFLUOgzo27vPGdTm-liw6-Sn3UM36s7/exec";
 
   // Backend independiente del módulo "Proyecto Recuperación de Rodeo" (ver apps-script-rodeo.gs).
-  // TODO: reemplazar por la URL del Web App una vez deployado el Apps Script en la Google Sheet del módulo.
-  const URL_GS_RODEO = "PENDIENTE_DEPLOY";
+  const URL_GS_RODEO = "https://script.google.com/macros/s/AKfycbwE_OqED9gg3e56UD9XrMe08SQdNB2LqpGQFxFuJsLUMy2P0xErAE8ru2FoWs_YHZzJ/exec";
 
   const RODEO_DUENOS = ['Alfredo', 'Blanca', 'Natalia', 'Gissela', 'Etel', 'Lourdes'];
   const RODEO_CLASIFICACIONES = ['Vaca', 'Vaquilla', 'Toro', 'Novillo', 'Novillito', 'Ternero', 'Ternera', 'Torito'];
@@ -302,11 +301,6 @@
     if (!caravana)      { flash('error', 'Ingresá el número de caravana'); return; }
     if (!dueno)         { flash('error', 'Seleccioná un dueño'); return; }
     if (!clasificacion) { flash('error', 'Seleccioná una clasificación'); return; }
-
-    if (URL_GS_RODEO === 'PENDIENTE_DEPLOY') {
-      flash('error', '⚠️ Backend del módulo aún no deployado — ver apps-script-rodeo.gs');
-      return;
-    }
 
     const vitamina      = document.getElementById('rodeo-vitamina').checked;
     const antipInterno  = document.getElementById('rodeo-antip-interno').checked;
