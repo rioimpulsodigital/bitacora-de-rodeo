@@ -5,7 +5,7 @@ import { tplRodeoForm, doGuardarRodeo } from './form.js';
 // Google Sheet donde este módulo guarda sus registros (ver
 // apps-script-rodeo.gs). Es un link de salida, no una vista interna
 // del módulo — por eso vive acá y no como un "tab" con estado propio.
-const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1vEYP-dOEE9vJNKxCcIjVYgcGCJSh7lqBa6rprHzl4hc/edit?usp=sharing';
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1-QTTWNFemY7AxVZYBT1wejhJ20tUJqvL8YNH1DQk-Bs/edit?usp=sharing';
 
 function tplNav() {
   return `<a class="tab-btn active" href="${SHEET_URL}" target="_blank" rel="noopener">📄 Planilla</a>`;

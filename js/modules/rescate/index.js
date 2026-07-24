@@ -17,7 +17,7 @@ let tab = 'session'; // session | report
 // Google Sheet donde este módulo guarda sus jornadas (ver
 // apps-script-rescate-equino.gs). Es un link de salida, no una vista
 // interna del módulo — por eso vive acá y no como un "tab" con estado propio.
-const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1-QTTWNFemY7AxVZYBT1wejhJ20tUJqvL8YNH1DQk-Bs/edit?usp=sharing';
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1xVuDJ1_NcljmQa5nI729k8_S7_b5VhniAkAS-jIIk-o/edit?usp=sharing';
 
 function tplNav() {
   return `
