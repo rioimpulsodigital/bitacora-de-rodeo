@@ -1,0 +1,13 @@
+/* ============================================================
+   TOKENS — variables de diseño y reset base.
+   No debe contener reglas de layout ni de componentes: solo la
+   paleta y el reset mínimo que todo lo demás da por sentado.
+   ============================================================ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --orange: #f87523; --yellow: #ffc31b; --teal: #1db7b9; --dark-teal: #126d68;
+  --bg: #e7dcc9; --surface: #f2e9d4; --surface2: #ddd0b5;
+  --border: #c8b89a; --text: #1e1a14; --muted: #7a6a55; --faint: #a89878;
+}

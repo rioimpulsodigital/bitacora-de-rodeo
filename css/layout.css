@@ -1,0 +1,53 @@
+/* ============================================================
+   LAYOUT — cromo de la aplicación (shell), común a todos los
+   módulos: body, header, barra de módulo, flash, footer,
+   scrollbar y la pantalla-centrada genérica (.idle-screen).
+   Ningún módulo debería necesitar tocar este archivo.
+   ============================================================ */
+
+body {
+  font-family: 'Trebuchet MS', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh; height: 100dvh;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+button { font-family: inherit; }
+
+/* HEADER */
+.header { padding: 16px 22px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.header-label { font-size: 10px; color: var(--faint); letter-spacing: 0.18em; text-transform: uppercase; }
+.header-date { font-size: 13px; color: var(--muted); margin-top: 2px; text-transform: capitalize; }
+
+/* Slot genérico de sub-navegación en el header (id="header-nav").
+   El shell solo lo muestra/oculta; el contenido lo decide cada
+   módulo activo (ver Rescate.switchTab para un ejemplo). */
+.tabs { display: flex; align-items: center; gap: 18px; }
+
+/* MODULO BAR */
+.modulo-bar { padding: 8px 22px; background: var(--surface2); border-bottom: 1px solid var(--border); display: none; align-items: center; justify-content: space-between; }
+.modulo-bar-label { font-size: 11px; color: var(--muted); font-weight: bold; letter-spacing: 0.03em; }
+.modulo-bar-switch { background: none; border: none; color: var(--dark-teal); font-weight: bold; cursor: pointer; font-size: 11px; letter-spacing: 0.03em; padding: 4px 2px; }
+.modulo-bar-switch:hover { text-decoration: underline; }
+
+/* FLASH */
+.flash { padding: 11px 22px; font-size: 13px; display: none; }
+.flash.ok    { display:block; background:#d4edda; border-bottom:1px solid #b8dfc4; color:#1a5c2a; }
+.flash.warn  { display:block; background:#fff3cd; border-bottom:1px solid #ffeaa0; color:#7a5c00; }
+.flash.error { display:block; background:#f8d7da; border-bottom:1px solid #f1b8bc; color:#8c1a1a; }
+
+/* Pantalla centrada genérica: la usan la portada y cualquier
+   módulo con una vista de "estado inicial" tipo splash. */
+.idle-screen { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:40px; padding:40px 24px; }
+
+::-webkit-scrollbar { width:5px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:#c8b89a; border-radius:3px; }
+
+/* FOOTER */
+.app-footer { padding:10px 22px; background:var(--surface); border-top:1px solid var(--border); display:flex; align-items:center; justify-content:center; gap:10px; flex-shrink:0; }
+.footer-logo { height:20px; opacity:0.8; }
+.footer-text { font-size:11px; color:var(--faint); letter-spacing:0.04em; }
+.footer-text a { color:var(--dark-teal); text-decoration:none; font-weight:bold; }
+.footer-text a:hover { text-decoration:underline; }

@@ -1,0 +1,56 @@
+/* ============================================================
+   COMPONENTES — piezas de UI reutilizables entre módulos.
+   Nada acá pertenece a un solo módulo: si en el futuro un
+   módulo nuevo (Tratamientos, Inspecciones, Reportes...)
+   necesita una tarjeta de opción, un botón de acción principal,
+   un campo de formulario o un bloque de estadísticas, ya existen
+   acá. No dupliques estas clases dentro de css/modules/*.
+   ============================================================ */
+
+/* Tabs genéricos (usados hoy por el sub-nav de Rescate; cualquier
+   módulo futuro con pestañas internas puede reusarlos) */
+.tab-btn { background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-size: 13px; padding: 4px 0; letter-spacing: 0.06em; color: var(--faint); }
+.tab-btn.active { color: var(--dark-teal); font-weight: bold; border-bottom-color: var(--dark-teal); }
+
+/* Tarjeta de opción clickeable — portada (selector de módulo) y
+   selección de período en Informes comparten esta misma clase. */
+.rpt-option { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; transition:background 0.15s; text-align:left; box-shadow:0 1px 4px var(--border); width:100%; margin-bottom:12px; }
+.rpt-option:hover { background:var(--surface2); }
+
+/* Link de "volver" genérico */
+.back-btn { background:none; border:none; color:var(--muted); font-size:12px; cursor:pointer; margin-top:4px; letter-spacing:0.06em; }
+
+/* Botón de acción principal, ancho completo (SALIDA, Guardar
+   Registro, Ver informe...) */
+.salida-btn { width:100%; background:linear-gradient(135deg,#126d68,#0d5a54); border:none; color:#fff; border-radius:12px; padding:15px; font-size:15px; font-weight:bold; letter-spacing:0.14em; cursor:pointer; text-transform:uppercase; box-shadow:0 4px 18px #126d6844; transition:opacity 0.2s; }
+.salida-btn:hover { opacity:0.85; }
+
+/* Textarea de texto libre — log de actividades y Observaciones
+   del formulario de Rodeo usan la misma clase base. */
+.act-textarea { flex:1; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px 14px; color:var(--text); font-size:13px; font-family:inherit; resize:none; outline:none; line-height:1.5; }
+.act-textarea::placeholder { color:var(--faint); }
+
+/* ── KIT DE INFORMES / REPORTES ──────────────────────────────
+   Pensado para reutilizarse tal cual en el futuro módulo de
+   Reportes/Estadísticas del roadmap, no solo en Rescate Equino. */
+.informes-wrap { padding:18px 22px; overflow-y:auto; }
+.informes-idle { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:340px; gap:20px; }
+.crear-btn { background:linear-gradient(135deg,#f87523,#d95f10); border:none; color:#fff; border-radius:12px; padding:16px 40px; font-size:15px; font-weight:bold; letter-spacing:0.1em; cursor:pointer; box-shadow:0 4px 20px #f8752344; transition:opacity 0.2s; }
+.crear-btn:hover { opacity:0.85; }
+.stat-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:16px; }
+.stat-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 12px; box-shadow:0 1px 4px var(--border); }
+.stat-lbl { font-size:9px; color:var(--faint); text-transform:uppercase; letter-spacing:0.12em; margin-bottom:6px; }
+.entry-card { background:#f2e9d4; border:1px solid #c8b89a; border-left:3px solid #f87523; border-radius:8px; padding:12px 16px; cursor:pointer; box-shadow:0 1px 4px #c8b89a44; transition:background 0.15s; margin-bottom:8px; }
+.entry-card:hover { background:#ddd0b5; }
+.entry-acts { margin-top:10px; padding-top:10px; border-top:1px solid #c8b89a; font-size:12px; color:#5a4a38; line-height:1.75; white-space:pre-wrap; display:none; }
+.export-btn { width:100%; background:var(--surface); border:1px solid var(--border); color:var(--muted); border-radius:8px; padding:9px; font-size:11px; cursor:pointer; margin-bottom:14px; letter-spacing:0.08em; text-transform:uppercase; }
+.nuevo-btn { background:var(--surface); border:1px solid var(--border); color:var(--orange); border-radius:8px; padding:8px 14px; font-size:12px; cursor:pointer; font-weight:bold; }
+
+/* ── KIT DE FORMULARIOS ───────────────────────────────────────
+   Usado hoy por Rodeo; cualquier módulo con captura de datos
+   (Tratamientos, Inspecciones, Usuarios...) reusa esto. */
+.form-wrap { padding:18px 22px; overflow-y:auto; }
+.form-label { font-size:10px; color:var(--faint); text-transform:uppercase; letter-spacing:0.12em; display:block; margin-bottom:6px; }
+.form-field { width:100%; padding:12px 14px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); font-size:15px; font-family:inherit; margin-bottom:16px; outline:none; }
+.form-check-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; font-size:14px; }
+.form-check-row input { width:20px; height:20px; flex-shrink:0; accent-color:var(--dark-teal); }

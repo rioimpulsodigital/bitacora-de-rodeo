@@ -1,0 +1,8 @@
+/* ============================================================
+   MÓDULO: Proyecto Recuperación de Rodeo
+   Hoy este módulo reutiliza el kit de formularios genérico
+   (css/components.css: .form-wrap, .form-field, .form-label,
+   .form-check-row) sin necesitar nada propio. Este archivo
+   queda intencionalmente vacío para establecer la convención:
+   cada módulo tiene su hoja de estilos, aunque empiece así.
+   ============================================================ */
