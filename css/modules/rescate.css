@@ -8,25 +8,25 @@
    ============================================================ */
 
 /* Pantalla de espera (reloj grande + botón LLEGADA) */
-.big-clock { font-size:76px; font-weight:bold; color:var(--text); letter-spacing:-4px; line-height:1; font-variant-numeric:tabular-nums; text-align:center; }
+.big-clock { font-family: var(--font-display); font-size:76px; font-weight:600; color:var(--text); letter-spacing:-2px; line-height:1; font-variant-numeric:tabular-nums; text-align:center; }
 .big-clock-sec { font-size:14px; color:var(--faint); margin-top:8px; letter-spacing:0.1em; text-align:center; }
-.llegada-btn { width:188px; height:188px; border-radius:50%; background:radial-gradient(circle at 36% 30%, #ffaa55, #f87523 68%); border:none; color:#fff; font-size:20px; font-weight:bold; letter-spacing:0.2em; text-transform:uppercase; cursor:pointer; box-shadow:0 6px 32px #f8752355; transition:transform 0.15s, box-shadow 0.2s; }
+.llegada-btn { font-family: var(--font-display); width:188px; height:188px; border-radius:50%; background:radial-gradient(circle at 36% 30%, #ffaa55, #f87523 68%); border:none; color:#fff; font-size:20px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; box-shadow:0 6px 32px #f8752355; transition:transform 0.15s, box-shadow 0.2s; }
 .llegada-btn:hover { transform:scale(1.07); box-shadow:0 10px 44px #f8752377; }
 .hint { font-size:11px; color:var(--faint); letter-spacing:0.1em; }
 
 /* Sesión activa: barra de estado + log de actividades */
 .session-wrap { flex:1; display:flex; flex-direction:column; overflow:hidden; }
 .status-bar { padding:14px 22px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
-.status-label { font-size:10px; color:var(--faint); text-transform:uppercase; letter-spacing:0.12em; }
-.val-orange { font-size:28px; font-weight:bold; color:var(--orange); font-variant-numeric:tabular-nums; }
+.status-label { font-family: var(--font-display); font-size:10px; color:var(--faint); text-transform:uppercase; letter-spacing:0.1em; }
+.val-orange { font-family: var(--font-display); font-size:28px; font-weight:600; color:var(--orange); font-variant-numeric:tabular-nums; }
 .val-center { font-size:17px; color:var(--text); font-variant-numeric:tabular-nums; }
-.val-teal   { font-size:28px; font-weight:bold; color:var(--dark-teal); }
-.badge-active { font-size:10px; color:var(--teal); text-transform:uppercase; letter-spacing:0.12em; margin-bottom:3px; }
+.val-teal   { font-family: var(--font-display); font-size:28px; font-weight:600; color:var(--dark-teal); }
+.badge-active { font-family: var(--font-display); font-size:10px; color:var(--teal); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:3px; }
 #activity-log { flex:1; overflow-y:auto; padding:14px 22px; display:flex; flex-direction:column; gap:8px; }
-.act-item { display:flex; gap:12px; align-items:flex-start; padding:10px 14px; background:var(--surface); border-radius:8px; border-left:3px solid var(--teal); box-shadow:0 1px 4px var(--border); }
+.act-item { display:flex; gap:12px; align-items:flex-start; padding:10px 14px; background:var(--surface); border-radius:14px; border-left:3px solid var(--teal); box-shadow:0 1px 4px var(--border); }
 .act-time { font-size:11px; color:var(--teal); white-space:nowrap; margin-top:2px; font-weight:bold; font-variant-numeric:tabular-nums; }
 .act-text  { font-size:13px; color:var(--text); line-height:1.55; }
 .act-empty { color:var(--faint); font-size:13px; text-align:center; margin-top:40px; font-style:italic; line-height:1.9; }
 .input-area { padding:12px 22px; border-top:1px solid var(--border); display:flex; gap:10px; background:var(--surface); }
-.add-btn { width:46px; flex-shrink:0; background:var(--yellow); border:none; color:#1a1200; border-radius:8px; font-size:24px; font-weight:bold; cursor:pointer; box-shadow:0 2px 10px #ffc31b66; }
+.add-btn { width:46px; flex-shrink:0; background:var(--yellow); border:none; color:#1a1200; border-radius:14px; font-size:24px; font-weight:bold; cursor:pointer; box-shadow:0 2px 10px #ffc31b66; }
 .salida-area { padding:14px 22px 26px; background:var(--surface); border-top:1px solid var(--border); }

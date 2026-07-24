@@ -5,19 +5,20 @@
 
 export function tplPortada(modules) {
   const cards = modules.map(m => `
-          <button class="rpt-option" style="border-left:4px solid ${m.color};padding:22px 20px;" onclick="App.selectModulo('${m.id}')">
-            <div style="text-align:left;">
-              <div style="font-size:15px;font-weight:bold;">${m.icon} ${m.portalTitle}</div>
-              <div style="font-size:11px;color:var(--muted);margin-top:4px;">${m.portalSubtitle}</div>
+          <button class="portal-option" style="background:${m.color};" onclick="App.selectModulo('${m.id}')">
+            <span class="portal-option-dot"></span>
+            <div class="portal-option-body">
+              <div class="portal-option-title">${m.icon} ${m.portalTitle}</div>
+              <div class="portal-option-subtitle">${m.portalSubtitle}</div>
             </div>
-            <span style="font-size:20px;color:${m.color}">→</span>
+            <span class="portal-option-arrow">→</span>
           </button>`).join('');
 
   return `
       <div class="idle-screen" style="gap:28px;">
         <div style="text-align:center;">
-          <div style="font-size:11px;color:var(--faint);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:8px;">Bitácora de Rodeo</div>
-          <div style="font-size:14px;color:var(--muted);">Selecciona con qué proyecto vas a trabajar</div>
+          <span class="portal-badge">Bitácora de Rodeo</span>
+          <div class="portal-title">¿Con qué <span style="color:var(--orange)">proyecto</span> vas a trabajar hoy?</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:16px;width:100%;max-width:360px;">${cards}
         </div>

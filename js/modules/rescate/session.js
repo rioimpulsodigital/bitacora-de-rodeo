@@ -63,7 +63,7 @@ export function tplActive() {
           </div>
         </div>` : ''}
         <div class="salida-area">
-          <button class="salida-btn" onclick="Rescate.doSalida()">SALIDA — cerrar jornada</button>
+          <button class="salida-btn" onclick="Rescate.doSalida()">Salida — cerrar jornada</button>
         </div>
       </div>`;
 }

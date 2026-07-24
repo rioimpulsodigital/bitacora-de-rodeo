@@ -1,0 +1,49 @@
+/* ============================================================
+   PORTADA — pantalla de selección de módulo. Vive en su propio
+   archivo (igual que js/core/portal.js) porque, aunque es "core",
+   tiene una identidad visual propia inspirada en la landing de
+   Lunita Pelu Vet (mismo lenguaje de marca del ecosistema RiO —
+   Bitácora de Rodeo va a vivir dentro de ese sitio más adelante).
+   ============================================================ */
+
+.portal-badge {
+  display: inline-block;
+  background: var(--mint);
+  color: var(--dark-teal);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 12px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  margin-bottom: 14px;
+}
+
+.portal-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 21px;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.portal-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  border: none;
+  border-radius: 26px;
+  padding: 18px 24px;
+  cursor: pointer;
+  text-align: left;
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(30, 20, 10, 0.18);
+  transition: transform 0.15s, box-shadow 0.2s;
+}
+.portal-option:hover { transform: scale(1.02); box-shadow: 0 6px 22px rgba(30, 20, 10, 0.24); }
+
+.portal-option-dot { width: 8px; height: 8px; margin-top: 7px; border-radius: 50%; background: rgba(255,255,255,0.85); flex-shrink: 0; }
+.portal-option-body { flex: 1; align-self: center; }
+.portal-option-title { font-family: var(--font-display); font-size: 15px; font-weight: 600; }
+.portal-option-subtitle { font-family: var(--font-body); font-size: 11px; color: rgba(255,255,255,0.82); margin-top: 3px; }
+.portal-option-arrow { font-size: 20px; color: #fff; align-self: center; }

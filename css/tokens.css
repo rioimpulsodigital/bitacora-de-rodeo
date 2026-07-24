@@ -10,4 +10,12 @@
   --orange: #f87523; --yellow: #ffc31b; --teal: #1db7b9; --dark-teal: #126d68;
   --bg: #e7dcc9; --surface: #f2e9d4; --surface2: #ddd0b5;
   --border: #c8b89a; --text: #1e1a14; --muted: #7a6a55; --faint: #a89878;
+  --mint: #bcd9d5;
+
+  /* Misma familia tipográfica que lunitapeluvet.rio-landing.com —
+     Fredoka para títulos/botones/cifras, Nunito para el resto.
+     Bitácora de Rodeo va a vivir dentro de ese sitio más adelante;
+     esto es lo que hace que se sienta continuación, no otra app. */
+  --font-display: 'Fredoka', sans-serif;
+  --font-body: 'Nunito', sans-serif;
 }
