@@ -6,23 +6,23 @@
    Bitácora de Rodeo va a vivir dentro de ese sitio más adelante).
    ============================================================ */
 
-.portal-badge {
-  display: inline-block;
-  background: var(--mint);
+/* Título principal — mismo tratamiento que el logo "Lunita Pelu
+   Vet" de la landing: cursiva de marca, grande, sin gritar. */
+.portal-logo {
+  display: block;
+  font-family: var(--font-brand);
+  font-weight: 700;
+  font-size: 40px;
   color: var(--dark-teal);
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 12px;
-  padding: 6px 16px;
-  border-radius: 999px;
-  margin-bottom: 14px;
+  line-height: 1;
+  margin-bottom: 8px;
 }
 
 .portal-title {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-weight: 600;
-  font-size: 21px;
-  color: var(--text);
+  font-size: 14px;
+  color: var(--muted);
   line-height: 1.35;
 }
 

@@ -15,10 +15,10 @@ body {
 }
 button { font-family: inherit; }
 
-/* HEADER */
-.header { padding: 16px 22px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-.header-label { font-family: var(--font-display); font-weight: 600; font-size: 10px; color: var(--faint); letter-spacing: 0.1em; text-transform: uppercase; }
-.header-date { font-size: 13px; color: var(--muted); margin-top: 2px; text-transform: capitalize; }
+/* HEADER — verde de marca, texto claro para contraste */
+.header { padding: 16px 22px; background: var(--dark-teal); border-bottom: 1px solid var(--dark-teal); display: flex; justify-content: space-between; align-items: center; }
+.header-label { font-family: var(--font-display); font-weight: 600; font-size: 10px; color: rgba(255,255,255,0.8); letter-spacing: 0.1em; text-transform: uppercase; }
+.header-date { font-size: 13px; color: #fff; margin-top: 2px; text-transform: capitalize; }
 
 /* Slot genérico de sub-navegación en el header (id="header-nav").
    El shell solo lo muestra/oculta; el contenido lo decide cada
@@ -28,8 +28,24 @@ button { font-family: inherit; }
 /* MODULO BAR */
 .modulo-bar { padding: 8px 22px; background: var(--surface2); border-bottom: 1px solid var(--border); display: none; align-items: center; justify-content: space-between; }
 .modulo-bar-label { font-family: var(--font-display); font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: 0.02em; }
-.modulo-bar-switch { font-family: var(--font-display); background: none; border: none; color: var(--dark-teal); font-weight: 600; cursor: pointer; font-size: 11px; letter-spacing: 0.02em; padding: 4px 2px; }
-.modulo-bar-switch:hover { text-decoration: underline; }
+
+/* Botón "Cambiar módulo" — misma pastilla sólida que un CTA de la
+   landing (p. ej. "Sacar turno"), no un link de texto plano. */
+.modulo-bar-switch {
+  font-family: var(--font-display);
+  background: var(--orange);
+  border: none;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  padding: 7px 16px;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(248, 117, 35, 0.4);
+  transition: opacity 0.2s;
+}
+.modulo-bar-switch:hover { opacity: 0.85; }
 
 /* FLASH */
 .flash { padding: 11px 22px; font-size: 13px; display: none; }
@@ -45,9 +61,9 @@ button { font-family: inherit; }
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background:#c8b89a; border-radius:3px; }
 
-/* FOOTER */
-.app-footer { padding:10px 22px; background:var(--surface); border-top:1px solid var(--border); display:flex; align-items:center; justify-content:center; gap:10px; flex-shrink:0; }
-.footer-logo { height:20px; opacity:0.8; }
-.footer-text { font-size:11px; color:var(--faint); letter-spacing:0.04em; }
-.footer-text a { color:var(--dark-teal); text-decoration:none; font-weight:bold; }
+/* FOOTER — mismo verde que el header, texto claro para contraste */
+.app-footer { padding:10px 22px; background:var(--dark-teal); border-top:1px solid var(--dark-teal); display:flex; align-items:center; justify-content:center; gap:10px; flex-shrink:0; }
+.footer-logo { height:20px; }
+.footer-text { font-size:11px; color:rgba(255,255,255,0.75); letter-spacing:0.04em; }
+.footer-text a { color:var(--yellow); text-decoration:none; font-weight:bold; }
 .footer-text a:hover { text-decoration:underline; }

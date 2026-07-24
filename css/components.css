@@ -7,10 +7,11 @@
    acá. No dupliques estas clases dentro de css/modules/*.
    ============================================================ */
 
-/* Tabs genéricos (usados hoy por el sub-nav de Rescate; cualquier
-   módulo futuro con pestañas internas puede reusarlos) */
-.tab-btn { font-family: var(--font-display); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-size: 13px; padding: 4px 0; letter-spacing: 0.02em; color: var(--faint); }
-.tab-btn.active { color: var(--dark-teal); font-weight: 600; border-bottom-color: var(--dark-teal); }
+/* Tabs genéricos — viven en el slot #header-nav, siempre sobre el
+   verde del header (usados hoy por el sub-nav de Rescate; cualquier
+   módulo futuro con pestañas internas puede reusarlos). */
+.tab-btn { font-family: var(--font-display); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-size: 13px; padding: 4px 0; letter-spacing: 0.02em; color: rgba(255,255,255,0.6); }
+.tab-btn.active { color: #fff; font-weight: 600; border-bottom-color: var(--yellow); }
 
 /* Tarjeta de opción clickeable — selección de período en Informes. */
 .rpt-option { background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; transition:background 0.15s; text-align:left; box-shadow:0 1px 4px var(--border); width:100%; margin-bottom:12px; }
@@ -24,6 +25,8 @@
    que los CTA de la landing, no gritado en mayúsculas. */
 .salida-btn { font-family: var(--font-display); width:100%; background:linear-gradient(135deg,#126d68,#0d5a54); border:none; color:#fff; border-radius:20px; padding:15px; font-size:15px; font-weight:600; letter-spacing:0.02em; cursor:pointer; box-shadow:0 4px 18px #126d6844; transition:opacity 0.2s; }
 .salida-btn:hover { opacity:0.85; }
+/* Modificador para acciones secundarias que no necesitan tanto peso visual. */
+.salida-btn.btn-compact { padding:11px; font-size:13px; border-radius:16px; }
 
 /* Textarea de texto libre — log de actividades y Observaciones
    del formulario de Rodeo usan la misma clase base. */
@@ -50,6 +53,7 @@
    Usado hoy por Rodeo; cualquier módulo con captura de datos
    (Tratamientos, Inspecciones, Usuarios...) reusa esto. */
 .form-wrap { padding:18px 22px; overflow-y:auto; }
+.form-title { font-family: var(--font-display); font-size:20px; font-weight:600; color:var(--dark-teal); text-align:center; margin-bottom:18px; }
 .form-label { font-family: var(--font-display); font-size:10px; color:var(--faint); text-transform:uppercase; letter-spacing:0.1em; display:block; margin-bottom:6px; }
 .form-field { width:100%; padding:12px 14px; border:1px solid var(--border); border-radius:14px; background:var(--bg); color:var(--text); font-size:15px; font-family:inherit; margin-bottom:16px; outline:none; }
 .form-check-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; font-size:14px; }

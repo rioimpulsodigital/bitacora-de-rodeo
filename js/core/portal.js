@@ -17,8 +17,8 @@ export function tplPortada(modules) {
   return `
       <div class="idle-screen" style="gap:28px;">
         <div style="text-align:center;">
-          <span class="portal-badge">Bitácora de Rodeo</span>
-          <div class="portal-title">¿Con qué <span style="color:var(--orange)">proyecto</span> vas a trabajar hoy?</div>
+          <span class="portal-logo">Bitácora de Rodeo</span>
+          <div class="portal-title">¿Con qué proyecto vas a trabajar hoy?</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:16px;width:100%;max-width:360px;">${cards}
         </div>

@@ -18,4 +18,7 @@
      esto es lo que hace que se sienta continuación, no otra app. */
   --font-display: 'Fredoka', sans-serif;
   --font-body: 'Nunito', sans-serif;
+  /* Cursiva de marca — la misma que usa el logotipo "Lunita Pelu Vet"
+     en la landing. Reservada para el título principal, no para uso general. */
+  --font-brand: 'Caveat', cursive;
 }

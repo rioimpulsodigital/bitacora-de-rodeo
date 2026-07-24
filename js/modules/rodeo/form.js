@@ -12,7 +12,7 @@ export function tplRodeoForm() {
   return `
       <div class="form-wrap">
         <div style="max-width:420px;margin:0 auto;">
-          <div style="font-size:11px;color:var(--faint);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:18px;text-align:center;">Nuevo registro</div>
+          <div class="form-title">🐮 Nuevo registro</div>
 
           <label class="form-label" for="rodeo-caravana">Caravana</label>
           <input type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1"
@@ -38,7 +38,7 @@ export function tplRodeoForm() {
           <label class="form-label" style="margin-top:6px;" for="rodeo-observaciones">Observaciones</label>
           <textarea id="rodeo-observaciones" class="form-field act-textarea" rows="3" placeholder="Observaciones (opcional)"></textarea>
 
-          <button class="salida-btn" onclick="Rodeo.doGuardarRodeo()">Guardar Registro</button>
+          <button class="salida-btn btn-compact" onclick="Rodeo.doGuardarRodeo()">Guardar Registro</button>
         </div>
       </div>`;
 }
