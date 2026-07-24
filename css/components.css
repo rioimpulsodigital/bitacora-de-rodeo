@@ -10,7 +10,7 @@
 /* Tabs genéricos — viven en el slot #header-nav, siempre sobre el
    verde del header (usados hoy por el sub-nav de Rescate; cualquier
    módulo futuro con pestañas internas puede reusarlos). */
-.tab-btn { font-family: var(--font-display); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-size: 13px; padding: 4px 0; letter-spacing: 0.02em; color: rgba(255,255,255,0.6); }
+.tab-btn { font-family: var(--font-display); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-size: 13px; padding: 4px 0; letter-spacing: 0.02em; color: rgba(255,255,255,0.6); text-decoration: none; display: inline-block; }
 .tab-btn.active { color: #fff; font-weight: 600; border-bottom-color: var(--yellow); }
 
 /* Tarjeta de opción clickeable — selección de período en Informes. */

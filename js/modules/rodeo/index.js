@@ -1,9 +1,15 @@
 // Módulo Proyecto Recuperación de Rodeo — punto de composición.
-// Sin sub-navegación propia (no implementa mountNav): el shell
-// oculta el slot de nav automáticamente cuando este módulo está
-// activo (ver core/app.js).
 
 import { tplRodeoForm, doGuardarRodeo } from './form.js';
+
+// Google Sheet donde este módulo guarda sus registros (ver
+// apps-script-rodeo.gs). Es un link de salida, no una vista interna
+// del módulo — por eso vive acá y no como un "tab" con estado propio.
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1vEYP-dOEE9vJNKxCcIjVYgcGCJSh7lqBa6rprHzl4hc/edit?usp=sharing';
+
+function tplNav() {
+  return `<a class="tab-btn active" href="${SHEET_URL}" target="_blank" rel="noopener">📄 Planilla</a>`;
+}
 
 const rodeoModule = {
   id: 'rodeo',
@@ -16,6 +22,10 @@ const rodeoModule = {
 
   mount(mainEl) {
     mainEl.innerHTML = tplRodeoForm();
+  },
+
+  mountNav(navEl) {
+    navEl.innerHTML = tplNav();
   },
 };
 
