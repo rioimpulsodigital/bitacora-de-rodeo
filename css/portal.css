@@ -6,6 +6,13 @@
    Bitácora de Rodeo va a vivir dentro de ese sitio más adelante).
    ============================================================ */
 
+.portal-isotipo {
+  display: block;
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 4px;
+}
+
 /* Título principal — mismo tratamiento que el logo "Lunita Pelu
    Vet" de la landing: cursiva de marca, grande, sin gritar. */
 .portal-logo {

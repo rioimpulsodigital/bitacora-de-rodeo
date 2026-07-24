@@ -17,6 +17,7 @@ export function tplPortada(modules) {
   return `
       <div class="idle-screen" style="gap:28px;">
         <div style="text-align:center;">
+          <img src="img/branding/BIT-logo-isotipo-transparente.png" alt="" class="portal-isotipo">
           <span class="portal-logo">Bitácora de Rodeo</span>
           <div class="portal-title">¿Con qué proyecto vas a trabajar hoy?</div>
         </div>
