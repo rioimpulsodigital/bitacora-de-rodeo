@@ -14,10 +14,16 @@ import * as calendar from './calendar.js';
 
 let tab = 'session'; // session | report
 
+// Google Sheet donde este módulo guarda sus jornadas (ver
+// apps-script-rescate-equino.gs). Es un link de salida, no una vista
+// interna del módulo — por eso vive acá y no como un "tab" con estado propio.
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1-QTTWNFemY7AxVZYBT1wejhJ20tUJqvL8YNH1DQk-Bs/edit?usp=sharing';
+
 function tplNav() {
   return `
       <button class="tab-btn ${tab === 'session' ? 'active' : ''}" onclick="Rescate.switchTab('session')">Jornada</button>
-      <button class="tab-btn ${tab === 'report' ? 'active' : ''}" onclick="Rescate.switchTab('report')">Informes</button>`;
+      <button class="tab-btn ${tab === 'report' ? 'active' : ''}" onclick="Rescate.switchTab('report')">Informes</button>
+      <a class="tab-btn active" href="${SHEET_URL}" target="_blank" rel="noopener">📄 Planilla</a>`;
 }
 
 function switchTab(t) {

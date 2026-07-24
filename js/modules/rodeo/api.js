@@ -2,7 +2,7 @@
 // Apps Script y Google Sheet propios, totalmente independientes
 // del módulo Rescate Equino Municipalidad (ver rescate/api.js).
 
-const URL_GS_RODEO = "https://script.google.com/macros/s/AKfycbwE_OqED9gg3e56UD9XrMe08SQdNB2LqpGQFxFuJsLUMy2P0xErAE8ru2FoWs_YHZzJ/exec";
+const URL_GS_RODEO = "https://script.google.com/macros/s/AKfycbwmqxoitQKmGRrYf7HR20JKzt_fPMWRNTl0fklOlwhjhjgywIPOVLJ-_oo9XxGeBebU/exec";
 
 export async function saveRegistro(payload) {
   const params = new URLSearchParams({ action: 'save', ...payload });

@@ -1,14 +1,20 @@
 // ============================================================
-// BITÁCORA DE TRABAJO — Google Apps Script
-// Pega este código en Extensions > Apps Script de tu Google Sheet
-// Luego: Deploy > New Deployment > Web App > Anyone > Deploy
+// RESCATE EQUINO MUNICIPALIDAD — Google Apps Script
+// Backend independiente del módulo Proyecto Recuperación de Rodeo
+// (ese módulo usa apps-script-rodeo.gs, sobre otra Google Sheet).
+//
+// Pega este código en Extensions > Apps Script de tu Google Sheet.
+// Luego: Deploy > New Deployment > Web App > Execute as: Me >
+// Who has access: Anyone > Deploy.
+// (La hoja "Registros" y sus encabezados se crean solos si no existen.)
 // ============================================================
 
-const SHEET_NAME = 'Bitácora';
+const SHEET_NAME = 'Registros';
+const HEADERS = ['Fecha', 'Llegada', 'Salida', 'Actividades', 'Duración (hs)'];
 
 function doGet(e) {
   const action = e.parameter.action;
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const sheet = getOrCreateSheet();
 
   // ── GUARDAR ENTRADA ──────────────────────────────────────
   if (action === 'save') {
@@ -20,6 +26,16 @@ function doGet(e) {
       parseFloat(e.parameter.duration)
     ];
     sheet.appendRow(row);
+
+    // Formatear Fecha/Llegada/Salida como texto plano DESPUÉS de
+    // escribirlas, y volver a escribir los mismos valores: si solo
+    // se cambia el formato de la celda ya no alcanza, Sheets necesita
+    // que el valor se re-escriba para dejar de tratarlo como Fecha/Hora.
+    const lastRow = sheet.getLastRow();
+    const dateRange = sheet.getRange(lastRow, 1, 1, 3);
+    dateRange.setNumberFormat('@');
+    dateRange.setValues([[e.parameter.date, e.parameter.arrival, e.parameter.departure]]);
+
     return respond({ success: true, message: 'Entrada guardada' });
   }
 
@@ -82,9 +98,9 @@ function doGet(e) {
     }
 
     const entries = filtered.map(r => ({
-      date: String(r[0]),
-      arrival: String(r[1]),
-      departure: String(r[2]),
+      date: formatCellDate(r[0]),
+      arrival: formatCellTime(r[1]),
+      departure: formatCellTime(r[2]),
       activities: String(r[3]),
       duration: parseFloat(r[4]) || 0
     }));
@@ -113,6 +129,16 @@ function doGet(e) {
 
 // ── HELPERS ─────────────────────────────────────────────────
 
+function getOrCreateSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
+    sheet.appendRow(HEADERS);
+  }
+  return sheet;
+}
+
 function respond(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
@@ -130,6 +156,24 @@ function parseDate(val) {
   if (!val) return null;
   const d = new Date(val);
   return isNaN(d.getTime()) ? null : d;
+}
+
+// Defensivos: si Sheets guardó la celda como Fecha/Hora en vez de
+// texto plano (auto-detección de Google Sheets, ver 'save' arriba),
+// esto la formatea igual de bien que si fuera el texto esperado.
+// Cubre tanto entradas nuevas como filas viejas ya mal tipadas.
+function formatCellDate(val) {
+  if (val instanceof Date) return formatDateStr(val);
+  return String(val);
+}
+
+function formatCellTime(val) {
+  if (val instanceof Date) {
+    const h = String(val.getHours()).padStart(2, '0');
+    const m = String(val.getMinutes()).padStart(2, '0');
+    return `${h}:${m}`;
+  }
+  return String(val);
 }
 
 function emptySummary() {

@@ -1,7 +1,7 @@
 // ============================================================
 // PROYECTO RECUPERACIÓN DE RODEO — Google Apps Script
 // Backend independiente del módulo Rescate Equino Municipalidad
-// (ese módulo usa apps-script.gs, sobre otra Google Sheet).
+// (ese módulo usa apps-script-rescate-equino.gs, sobre otra Google Sheet).
 //
 // Cómo deployar:
 // 1. Crear una Google Sheet nueva llamada "Proyecto Recuperación de Rodeo".

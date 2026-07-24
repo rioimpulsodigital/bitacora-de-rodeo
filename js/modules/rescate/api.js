@@ -2,7 +2,7 @@
 // Script propio). Ningún otro módulo debería importar este
 // archivo, ni este archivo debería saber nada de otros módulos.
 
-const URL_GS = "https://script.google.com/macros/s/AKfycbyUqWLiXTcw0o5cjRyrlZuR9Y-cmP2IHManoRFLUOgzo27vPGdTm-liw6-Sn3UM36s7/exec";
+const URL_GS = "https://script.google.com/macros/s/AKfycbwKLr7HNs4D44X4DhIX6ieKdVciFOcncNbFGfdODQneG3D5dluRit0V_O5hn2AYUmMy/exec";
 
 export async function saveJornada({ date, arrival, departure, activities, duration }) {
   const params = new URLSearchParams({
