@@ -35,7 +35,7 @@ Soy **Anthy** (Claude Code), asistente técnico de RiO Impulso Digital para este
 
 Biblioteca completa: https://app.notion.com/p/3a66c976f0cd818ead5ae23db9a10d4a ("✨ Forma de Trabajar")
 
-- **Estándar de Informes Técnicos** — Tipo A (11 secciones, tareas grandes) / Tipo B (auditoría, 10 fases) / Tipo C (5 bloques, fixes chicos). Adoptado desde el 24 Jul 2026 — antes usaba un formato libre propio.
+- **Estándar de Informes Técnicos** (nombre simplificado el 25 Jul 2026, antes "— Implementación y Auditoría") — Tipo A (11 secciones, tareas grandes) / Tipo B (auditoría de algo que ya existe/pasó, 10 fases) / Tipo C (5 bloques, fixes chicos) / **Tipo D (análisis de dominio y diseño funcional, sin código — propuesto por mí a partir de BIT-30, sumado al Estándar el 25 Jul 2026)**. Adoptado desde el 24 Jul 2026 — antes usaba un formato libre propio.
 - **Metodología de Auditoría Operativa** — aplicar cuando se investiga un bug real, no una implementación planificada.
 - **Sistema de Trabajo — RiO Impulso Digital** — división de roles y estructura general.
 - **Entorno de Trabajo — VS Code + IA** — mayormente no aplica (está armado para PHP/Laravel/cPanel); solo la sección de conexión MCP a Notion es relevante acá.
