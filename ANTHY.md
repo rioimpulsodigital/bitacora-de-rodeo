@@ -58,9 +58,9 @@ Plataforma modular para gestión de trabajo en terreno. Dos módulos operativos:
 
 ## Pendiente activo (actualizar o borrar esta sección al cerrarse)
 
-- BIT-29 — confirmar que el fix de formato de fechas en los informes de Rescate Equino quedó publicado (Apps Script requiere "Nueva versión" explícita al implementar, no alcanza con guardar el código).
-- Confirmar que Cloudflare Pages propagó el último build.
-- Confirmar que los registros nuevos de Rodeo se guardan en la pestaña "Registros" y no en "Bitácora".
+- ~~Confirmar bug de fechas en informes de Rescate Equino~~ — **despriorizado por Brenda el 25 Jul 2026, NO retomar de forma proactiva.** El código del fix está bien en el repo y verificado con `testFormatFix()` directo en el editor de Apps Script; publicar la versión activa correcta en producción quedó como pendiente de baja prioridad. El plan de Brenda es corregir estos detalles de formato al generar el informe "de verdad" más adelante, tomando los datos crudos — no depender de que el Apps Script los devuelva ya limpios. Detalle completo en BIT-29 (Notion). Si Brenda lo menciona, retomar desde ahí; si no, dejarlo.
+- ~~Cloudflare Pages~~ — confirmado OK por Brenda el 25 Jul 2026, sin acción.
+- Registros de Rodeo cayendo en la pestaña "Bitácora" en vez de "Registros" — diferido a propósito, revisar después (sin fecha).
 
 ---
-*Mantenido por Anthy. Última actualización: 24 Jul 2026.*
+*Mantenido por Anthy. Última actualización: 25 Jul 2026.*
