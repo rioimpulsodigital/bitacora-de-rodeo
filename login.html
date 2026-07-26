@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ingresar — Bitácora de Rodeo</title>
+  <link rel="icon" type="image/png" href="img/branding/BIT-favicon.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/login.css">
+</head>
+<body class="login-body">
+
+  <div class="login-card">
+    <img class="login-logo" src="img/branding/BIT-logo-isotipo-transparente.png" alt="Bitácora de Rodeo">
+    <div class="login-appname">Bitácora de Rodeo</div>
+
+    <form id="login-form" novalidate>
+      <label class="form-label" for="login-email">Email</label>
+      <input class="form-field" type="email" id="login-email" autocomplete="username" required>
+
+      <label class="form-label" for="login-password">Contraseña</label>
+      <input class="form-field" type="password" id="login-password" autocomplete="current-password" required>
+
+      <div class="login-error" id="login-error"></div>
+
+      <button type="submit" class="salida-btn" id="login-submit">Ingresar</button>
+    </form>
+  </div>
+
+  <script type="module" src="js/login.js"></script>
+</body>
+</html>

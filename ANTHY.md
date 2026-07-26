@@ -48,7 +48,7 @@ Plataforma modular para gestión de trabajo en terreno. Dos módulos operativos:
 - **Rescate Equino Municipalidad** — registro de jornada laboral, informes diario/semanal/mensual.
 - **Proyecto Recuperación de Rodeo** — formulario de intervención sanitaria sobre animales.
 
-**Stack:** HTML/CSS/JS vanilla, ES Modules nativos (sin build, sin npm) — decisión firme, no proponer frameworks. Backend: Google Apps Script + Google Sheets, uno independiente por módulo (`apps-script-rescate-equino.gs`, `apps-script-rodeo.gs`), ambos bajo la cuenta `lunitapeluvet@gmail.com`.
+**Stack:** HTML/CSS/JS vanilla, ES Modules nativos (sin build, sin npm) — decisión firme, no proponer frameworks. Los dos módulos operativos (Rescate Equino, Rodeo) siguen sobre Google Apps Script + Google Sheets, bajo `lunitapeluvet@gmail.com` — **en migración hacia Supabase** (PostgreSQL + Auth), decidido en BIT-01. Desde el 26 Jul 2026 la app tiene **login obligatorio con Supabase Auth** (`login.html`, `js/core/auth.js`, `js/core/supabase-client.js` — BIT-03); la Anon Key vive commiteada en el repo a propósito (no es secreta, aprobado por Brenda). El esquema completo de tablas está diseñado en BIT-02, todavía no implementado contra datos reales. Row Level Security queda pendiente para BIT-04 — hasta entonces, cualquier sesión válida puede leer/escribir sin restricción de fila.
 
 **Arquitectura del frontend:** registro de módulos — cada módulo en `js/modules/<id>/` exporta un objeto con contrato fijo (`mount`, `mountNav` opcional, `onTick` opcional). `js/core/*` nunca importa de un módulo específico. Agregar un módulo nuevo = una carpeta + 2 líneas en `main.js` + un `<link>` CSS, sin tocar el núcleo.
 
@@ -61,6 +61,8 @@ Plataforma modular para gestión de trabajo en terreno. Dos módulos operativos:
 - ~~Confirmar bug de fechas en informes de Rescate Equino~~ — **despriorizado por Brenda el 25 Jul 2026, NO retomar de forma proactiva.** El código del fix está bien en el repo y verificado con `testFormatFix()` directo en el editor de Apps Script; publicar la versión activa correcta en producción quedó como pendiente de baja prioridad. El plan de Brenda es corregir estos detalles de formato al generar el informe "de verdad" más adelante, tomando los datos crudos — no depender de que el Apps Script los devuelva ya limpios. Detalle completo en BIT-29 (Notion). Si Brenda lo menciona, retomar desde ahí; si no, dejarlo.
 - ~~Cloudflare Pages~~ — confirmado OK por Brenda el 25 Jul 2026, sin acción.
 - Registros de Rodeo cayendo en la pestaña "Bitácora" en vez de "Registros" — diferido a propósito, revisar después (sin fecha).
+- **BIT-30/BIT-31 (dominio y modelo funcional)** — BIT-31 (Principios del Dominio) ya pasó revisión de arquitectura de Brenda y quedó incorporada (P-001, independencia del medio, etc.). BIT-30 resumió el 26 Jul 2026 con una tercera iteración fundamentada en BIT-31 (Persona/Establecimiento/Animal/Lote/Jornada/Visita/Atención Clínica/Observación de Campo como aggregate roots). **Pendiente antes de darlo por cerrado del todo:** validar con Etel los ~15 escenarios reales que propone BIT-31 (sección "Próximo paso"), y decidir si "Animal" pasa a llamarse "Paciente Animal" (alineado con LunitaPeluVet). No reabrir la discusión conceptual de BIT-31 salvo evidencia real que la contradiga.
+- **RLS (Row Level Security)** — explícitamente fuera de alcance de BIT-01/02/03, queda para BIT-04. Hasta que se implemente, no hay protección de datos a nivel de fila más allá de requerir sesión válida.
 
 ---
-*Mantenido por Anthy. Última actualización: 25 Jul 2026.*
+*Mantenido por Anthy. Última actualización: 26 Jul 2026.*

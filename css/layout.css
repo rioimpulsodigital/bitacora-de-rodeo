@@ -67,3 +67,5 @@ button { font-family: inherit; }
 .footer-text { font-size:11px; color:rgba(255,255,255,0.75); letter-spacing:0.04em; }
 .footer-text a { color:var(--yellow); text-decoration:none; font-weight:bold; }
 .footer-text a:hover { text-decoration:underline; }
+.footer-logout { font-family: var(--font-body); background:none; border:none; color:rgba(255,255,255,0.75); font-size:11px; letter-spacing:0.04em; cursor:pointer; text-decoration:underline; padding:0; }
+.footer-logout:hover { color:#fff; }
