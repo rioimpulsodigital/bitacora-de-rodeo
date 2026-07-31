@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bitácora de Rodeo</title>
+  <link rel="icon" type="image/png" href="../img/branding/BIT-favicon.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/tokens.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="rodeo-body">
+
+  <header class="rodeo-header">
+    <div class="rodeo-header-brand">
+      <img src="../img/branding/BIT-logo-isotipo-transparente.png" alt="">
+      <span>Bitácora de Rodeo</span>
+    </div>
+    <div class="rodeo-header-establecimiento" id="rodeo-establecimiento"></div>
+    <div class="rodeo-header-user" id="rodeo-user"></div>
+  </header>
+
+  <div class="rodeo-body-row">
+    <nav class="rodeo-sidebar" id="rodeo-sidebar">
+      <a href="#dashboard" class="rodeo-sidebar-item" data-view="dashboard">📊 Dashboard</a>
+      <a href="#jornadas" class="rodeo-sidebar-item" data-view="jornadas">🕒 Jornadas</a>
+    </nav>
+    <main class="rodeo-content" id="rodeo-content">
+      <p class="rodeo-loading">Cargando…</p>
+    </main>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

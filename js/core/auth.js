@@ -21,3 +21,19 @@ export function signIn(email, password) {
 export async function signOut() {
   await supabase.auth.signOut();
 }
+
+// Guardia de sesión compartida por cualquier punto de entrada de la app
+// (portal legacy, rodeo/). Sin sesión válida redirige a loginUrl; con
+// sesión, además queda escuchando cambios de estado para expulsar si la
+// sesión se cierra en otra pestaña o el token vence mientras está abierta.
+export async function requireSession(loginUrl) {
+  const session = await getSession();
+  if (!session) {
+    location.replace(loginUrl);
+    return null;
+  }
+  onAuthStateChange((s) => {
+    if (!s) location.replace(loginUrl);
+  });
+  return session;
+}

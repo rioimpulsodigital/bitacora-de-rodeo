@@ -31,6 +31,12 @@ Soy **Anthy** (Claude Code), asistente técnico de RiO Impulso Digital para este
 1. Revisar Agenda de Tareas — qué está 🔄 En curso o ⏸️ Bloqueada.
 2. Si algo no cierra con lo que dice Brenda, preguntar antes de asumir — no inferir desde el nombre de un botón o funcionalidad.
 
+## Reglas de trabajo con Brenda
+
+Este archivo es mi única memoria de proyecto — no crear archivos de memoria propios (fuera del repo) con reglas o contexto de Bitácora de Rodeo, para evitar que la información quede fragmentada en dos lugares. Todo lo que aprenda sobre cómo trabajar en este proyecto va acá.
+
+- **Commits por hito, no por BIT individual.** Cuando varios BITs quedan implementados pero todavía faltan validaciones de otros roles/escenarios que Brenda pidió, esperar a que se validen todos antes de commitear — un único commit que represente el hito completo, no uno por cada BIT. No ofrecer subir cambios apenas un BIT pasa su propia prueba si hay otras validaciones pendientes en danza.
+
 ## Manuales de la Biblioteca que me aplican
 
 Biblioteca completa: https://app.notion.com/p/3a66c976f0cd818ead5ae23db9a10d4a ("✨ Forma de Trabajar")
@@ -48,9 +54,15 @@ Plataforma modular para gestión de trabajo en terreno. Dos módulos operativos:
 - **Rescate Equino Municipalidad** — registro de jornada laboral, informes diario/semanal/mensual.
 - **Proyecto Recuperación de Rodeo** — formulario de intervención sanitaria sobre animales.
 
-**Stack:** HTML/CSS/JS vanilla, ES Modules nativos (sin build, sin npm) — decisión firme, no proponer frameworks. Los dos módulos operativos (Rescate Equino, Rodeo) siguen sobre Google Apps Script + Google Sheets, bajo `lunitapeluvet@gmail.com` — **en migración hacia Supabase** (PostgreSQL + Auth), decidido en BIT-01. Desde el 26 Jul 2026 la app tiene **login obligatorio con Supabase Auth** (`login.html`, `js/core/auth.js`, `js/core/supabase-client.js` — BIT-03); la Anon Key vive commiteada en el repo a propósito (no es secreta, aprobado por Brenda). El esquema completo de tablas está diseñado en BIT-02, todavía no implementado contra datos reales. Row Level Security queda pendiente para BIT-04 — hasta entonces, cualquier sesión válida puede leer/escribir sin restricción de fila.
+**Stack:** HTML/CSS/JS vanilla, ES Modules nativos (sin build, sin npm) — decisión firme, no proponer frameworks. Los dos módulos operativos (Rescate Equino, Rodeo) siguen sobre Google Apps Script + Google Sheets, bajo `lunitapeluvet@gmail.com` — **en migración hacia Supabase** (PostgreSQL + Auth), decidido en BIT-01. Desde el 26 Jul 2026 la app tiene **login obligatorio con Supabase Auth** (`login.html`, `js/core/auth.js`, `js/core/supabase-client.js` — BIT-03); la Anon Key vive commiteada en el repo a propósito (no es secreta, aprobado por Brenda).
 
-**Arquitectura del frontend:** registro de módulos — cada módulo en `js/modules/<id>/` exporta un objeto con contrato fijo (`mount`, `mountNav` opcional, `onTick` opcional). `js/core/*` nunca importa de un módulo específico. Agregar un módulo nuevo = una carpeta + 2 líneas en `main.js` + un `<link>` CSS, sin tocar el núcleo.
+**Modelo de usuarios/roles (BIT-04, cerrado el 27 Jul 2026):** Bitácora es colaborativa — los datos pertenecen al **Establecimiento**, no a quien los registra. Tres roles V1: `ADMINISTRADOR` / `PROFESIONAL` / `OPERADOR_CAMPO` (un cuarto, `PROPIETARIO`, queda preparado pero no implementado). `perfiles` (1:1 con `auth.users`) reemplaza a la vieja idea de "profesionales" de BIT-02 — **el script de BIT-02 quedó reemplazado por el consolidado de BIT-04, no usar el viejo**.
+
+**Ya ejecutado contra el proyecto real** (`tejnjojuoiuehnpsynof.supabase.co`): estructura + RLS corridas, perfiles creados (ADMINISTRADOR = Brenda, PROFESIONAL = Etel Salinas / `lunitapeluvet@gmail.com`, OPERADOR_CAMPO = cuenta de prueba), batería de pruebas de permisos por rol y aislamiento entre establecimientos con resultado PASS. Dos correcciones reales aparecieron recién al ejecutar (ya incorporadas en el documento de BIT-04): falta un `GRANT` explícito a `authenticated` (habilitar RLS no alcanza por sí solo) y las dos funciones auxiliares (`is_admin()`, `tiene_acceso_establecimiento()`) necesitan `SECURITY DEFINER` + `search_path` fijo para no recursar contra tablas que también tienen RLS. Quedan datos de prueba en la base, renombrados como seed data ("Demo") para BIT-05, no se borraron. Base de datos congelada como v1.0.
+
+**Arquitectura del frontend legacy (raíz, `index.html`):** registro de módulos — cada módulo en `js/modules/<id>/` exporta un objeto con contrato fijo (`mount`, `mountNav` opcional, `onTick` opcional). `js/core/*` nunca importa de un módulo específico. Agregar un módulo nuevo = una carpeta + 2 líneas en `main.js` + un `<link>` CSS, sin tocar el núcleo. **Vivo, en uso real por Etel — no tocar salvo pedido explícito.**
+
+**Arquitectura del frontend nuevo (`/rodeo/`, BIT-05/06 en adelante):** completamente aislado del legacy, mismo tokens.css para identidad visual. Router mínimo por hash (`rodeo/js/router.js`) — cada vista se registra una vez y exporta `mount(contenedor, ctx)`. `ctx` trae `perfil`, `establecimientos` y `establecimientoActivoId` (getter, siempre vigente). Módulos funcionales viven en `rodeo/js/modules/<id>/` con `index.js` (registra rutas), `list.js`, `form.js` — **convención agregada por Brenda el 29 Jul 2026: cuando un módulo crezca (Animales, Atenciones Clínicas), que sea completamente autónomo** (sumar `detail.js`, `services.js`, `validators.js`, `templates.js` propios en vez de compartir con otros módulos) — no aplica todavía a Jornadas por ser chico, pero es la regla para los que siguen. `rodeo/js/services/` tiene los servicios compartidos (perfiles, establecimientos, y uno nuevo por cada tabla de dominio) — el frontend nunca repite lógica de permisos, RLS decide todo. Reutiliza `js/core/supabase-client.js` y `js/core/auth.js` de la raíz sin duplicar.
 
 **Identidad de marca:** alineada con la landing de Lunita Pelu Vet (lunitapeluvet.rio-landing.com) — misma tipografía (Fredoka/Nunito/Caveat), misma paleta, bordes redondeados. Bitácora de Rodeo eventualmente vivirá embebida dentro de ese sitio.
 
@@ -62,7 +74,10 @@ Plataforma modular para gestión de trabajo en terreno. Dos módulos operativos:
 - ~~Cloudflare Pages~~ — confirmado OK por Brenda el 25 Jul 2026, sin acción.
 - Registros de Rodeo cayendo en la pestaña "Bitácora" en vez de "Registros" — diferido a propósito, revisar después (sin fecha).
 - **BIT-30/BIT-31 (dominio y modelo funcional)** — BIT-31 (Principios del Dominio) ya pasó revisión de arquitectura de Brenda y quedó incorporada (P-001, independencia del medio, etc.). BIT-30 resumió el 26 Jul 2026 con una tercera iteración fundamentada en BIT-31 (Persona/Establecimiento/Animal/Lote/Jornada/Visita/Atención Clínica/Observación de Campo como aggregate roots). **Pendiente antes de darlo por cerrado del todo:** validar con Etel los ~15 escenarios reales que propone BIT-31 (sección "Próximo paso"), y decidir si "Animal" pasa a llamarse "Paciente Animal" (alineado con LunitaPeluVet). No reabrir la discusión conceptual de BIT-31 salvo evidencia real que la contradiga.
-- **RLS (Row Level Security)** — explícitamente fuera de alcance de BIT-01/02/03, queda para BIT-04. Hasta que se implemente, no hay protección de datos a nivel de fila más allá de requerir sesión válida.
+- ~~BIT-04 (roles + RLS)~~ — **cerrado y ejecutado el 27 Jul 2026.** Base de datos v1.0 congelada, con roles/RLS funcionando y verificados contra el proyecto real. Ver BIT-04 en Notion (sección 15) para el detalle de la ejecución y las dos correcciones técnicas que aparecieron recién al correr contra la base real.
+- Recomendaciones abiertas de BIT-04, no bloqueantes: actualizar BIT-30 con ADMINISTRADOR/OPERADOR_CAMPO como actores del dominio + entidad futura `tratamientos_aplicaciones`; revisar en una futura pasada de RLS que `adjuntos` herede acceso de su entidad padre en vez de depender solo del autor.
+- ~~BIT-05 (infraestructura `/rodeo/`) y BIT-06 (módulo Jornadas)~~ — **cerrados el 30 Jul 2026.** Validados con los tres perfiles (PROFESIONAL: 29 Jul, ADMINISTRADOR y OPERADOR_CAMPO: 30 Jul) mediante Playwright contra el proyecto real de Supabase. Commit de consolidación incluido en este cierre.
+- **Plan confirmado por Brenda para lo que sigue, mismo patrón que Jornadas (router + `mount(contenedor, ctx)` + servicio propio):** BIT-07 Animales, BIT-08 Visitas, BIT-09 Observaciones, BIT-10 Atenciones Clínicas. Todavía no creados en Notion — son una recomendación aceptada, no tareas activas.
 
 ---
-*Mantenido por Anthy. Última actualización: 26 Jul 2026.*
+*Mantenido por Anthy. Última actualización: 30 Jul 2026.*
