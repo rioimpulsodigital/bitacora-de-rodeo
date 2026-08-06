@@ -17,7 +17,7 @@ export async function mountLotesList(contenedor, ctx) {
       <td>${escapeHtml(l.nombre)}</td>
       <td>${escapeHtml(l.notas ?? '—')}</td>
       <td class="rodeo-table-acciones">
-        <a href="#lotes/editar/${l.id}">Editar</a>
+        <a href="#animales/lotes/editar/${l.id}">Editar</a>
       </td>
     </tr>`).join('');
 
@@ -25,7 +25,10 @@ export async function mountLotesList(contenedor, ctx) {
     <div class="rodeo-card">
       <div class="rodeo-card-header">
         <h2>Lotes</h2>
-        <a class="rodeo-btn" href="#lotes/nuevo">+ Nuevo Lote</a>
+        <div style="display:flex;align-items:center;gap:10px">
+          <a class="rodeo-btn" href="#animales/lotes/nuevo">+ Nuevo Lote</a>
+          <a href="#animales" class="rodeo-link-btn">← Pacientes</a>
+        </div>
       </div>
       ${lotes.length === 0
         ? '<p>No hay lotes registrados todavía.</p>'

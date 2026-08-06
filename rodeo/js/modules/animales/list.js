@@ -31,7 +31,10 @@ export async function mountAnimalesList(contenedor, ctx) {
     <div class="rodeo-card">
       <div class="rodeo-card-header">
         <h2>Pacientes Animales</h2>
-        <a class="rodeo-btn" href="#animales/nuevo">+ Nuevo Paciente</a>
+        <div style="display:flex;align-items:center;gap:10px">
+          <a class="rodeo-btn" href="#animales/nuevo">+ Nuevo Paciente</a>
+          <a href="#animales/lotes" class="rodeo-link-btn">📦 Lotes</a>
+        </div>
       </div>
       ${animales.length === 0
         ? '<p>No hay pacientes registrados todavía.</p>'

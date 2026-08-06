@@ -32,7 +32,7 @@ export async function mountLoteForm(contenedor, ctx, id) {
 
         <div class="rodeo-form-acciones">
           <button type="submit" class="salida-btn">Guardar</button>
-          <a href="#lotes" class="rodeo-link-btn">Volver al listado</a>
+          <a href="#animales/lotes" class="rodeo-link-btn">Volver a Lotes</a>
         </div>
       </form>
     </div>`;
@@ -57,7 +57,7 @@ export async function mountLoteForm(contenedor, ctx, id) {
     try {
       if (lote) await actualizarLote(lote.id, campos);
       else await crearLote(campos);
-      location.hash = '#lotes';
+      location.hash = '#animales/lotes';
     } catch (err) {
       errorEl.textContent = 'Error al guardar: ' + err.message;
     }
