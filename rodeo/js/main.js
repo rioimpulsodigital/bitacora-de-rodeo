@@ -12,6 +12,7 @@ import {
 import { renderHeaderUsuario, renderHeaderEstablecimiento, renderSinPerfil, mountDashboard } from './dashboard.js';
 import { registerRoute, iniciarRouter, resolverRuta } from './router.js';
 import { registrarRutasJornadas } from './modules/jornadas/index.js';
+import { registrarRutasAnimales } from './modules/animales/index.js';
 
 async function handleSignOut() {
   await signOut();
@@ -56,6 +57,7 @@ async function iniciar() {
   const contenedor = document.getElementById('rodeo-content');
   registerRoute('dashboard', () => mountDashboard(contenedor, ctx));
   registrarRutasJornadas(contenedor, ctx);
+  registrarRutasAnimales(contenedor, ctx);
 
   iniciarRouter('dashboard');
 }

@@ -138,3 +138,11 @@
 
 .rodeo-form-acciones { display: flex; align-items: center; margin-top: 4px; }
 .rodeo-hint { color: var(--faint); font-size: 12px; margin: -6px 0 14px; }
+.rodeo-required { color: #8c1a1a; }
+.rodeo-inline-form {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 8px 0 12px;
+}
