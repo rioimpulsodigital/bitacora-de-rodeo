@@ -14,6 +14,7 @@ import { registerRoute, iniciarRouter, resolverRuta } from './router.js';
 import { registrarRutasJornadas } from './modules/jornadas/index.js';
 import { registrarRutasAnimales } from './modules/animales/index.js';
 import { registrarRutasVisitas } from './modules/visitas/index.js';
+import { registrarRutasObservaciones } from './modules/observaciones/index.js';
 
 async function handleSignOut() {
   await signOut();
@@ -60,6 +61,7 @@ async function iniciar() {
   registrarRutasJornadas(contenedor, ctx);
   registrarRutasAnimales(contenedor, ctx);
   registrarRutasVisitas(contenedor, ctx);
+  registrarRutasObservaciones(contenedor, ctx);
 
   iniciarRouter('dashboard');
 }
