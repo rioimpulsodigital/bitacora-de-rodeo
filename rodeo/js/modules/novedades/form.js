@@ -67,6 +67,7 @@ export async function mountNovedadForm(contenedor, ctx, id) {
     const today = new Date().toISOString().split('T')[0];
 
     contenedor.innerHTML = `
+      <div class="rodeo-card">
       <div class="rodeo-view-header">
         <h2>${esEdicion ? 'Editar Novedad' : 'Nueva Novedad'}</h2>
         <a href="#novedades" class="rodeo-btn">← Volver</a>
@@ -126,7 +127,8 @@ export async function mountNovedadForm(contenedor, ctx, id) {
             ${esEdicion ? 'Guardar cambios' : 'Crear novedad'}
           </button>
         </div>
-      </form>`;
+      </form>
+      </div>`;
 
     // Mostrar/ocultar precipitacion_mm según tipo
     document.getElementById('novedad-tipo').addEventListener('change', (e) => {

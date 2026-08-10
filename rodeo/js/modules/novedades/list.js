@@ -55,11 +55,13 @@ export async function mountNovedadesList(contenedor, ctx) {
     }
 
     contenedor.innerHTML = `
-      <div class="rodeo-view-header">
-        <h2>📰 Novedades del Establecimiento</h2>
-        <a href="#novedades/nueva" class="rodeo-btn rodeo-btn-primary">+ Nueva Novedad</a>
-      </div>
-      ${cuerpo}`;
+      <div class="rodeo-card">
+        <div class="rodeo-view-header">
+          <h2>📰 Novedades del Establecimiento</h2>
+          <a href="#novedades/nueva" class="rodeo-btn rodeo-btn-primary">+ Nueva Novedad</a>
+        </div>
+        ${cuerpo}
+      </div>`;
   } catch (err) {
     contenedor.innerHTML = `<p class="rodeo-error">Error al cargar novedades: ${err.message}</p>`;
   }
