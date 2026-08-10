@@ -91,6 +91,15 @@
   padding: 24px 28px;
 }
 
+.rodeo-view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.rodeo-view-header h2 { margin: 0; }
+.rodeo-empty { color: var(--muted); font-size: 14px; }
+
 .rodeo-loading, .rodeo-error { color: var(--muted); font-size: 14px; }
 .rodeo-error { color: #8c1a1a; }
 
