@@ -30,6 +30,19 @@ if (existing) {
   location.replace('index.html');
 }
 
+// Toggle de visibilidad de contraseña
+const toggleBtn = document.getElementById('toggle-password');
+const eyeShow = toggleBtn.querySelector('.eye-show');
+const eyeHide = toggleBtn.querySelector('.eye-hide');
+
+toggleBtn.addEventListener('click', () => {
+  const visible = passwordEl.type === 'text';
+  passwordEl.type = visible ? 'password' : 'text';
+  eyeShow.style.display = visible ? '' : 'none';
+  eyeHide.style.display = visible ? 'none' : '';
+  toggleBtn.setAttribute('aria-label', visible ? 'Mostrar contraseña' : 'Ocultar contraseña');
+});
+
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   clearError();
