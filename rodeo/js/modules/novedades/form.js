@@ -120,9 +120,6 @@ export async function mountNovedadForm(contenedor, ctx, id) {
         <div id="form-error" class="rodeo-error" style="display:none"></div>
 
         <div class="form-actions">
-          ${esEdicion && esAdmin
-            ? '<button type="button" id="btn-eliminar" class="rodeo-btn rodeo-btn-danger">Eliminar</button>'
-            : ''}
           <button type="submit" class="rodeo-btn rodeo-btn-primary">
             ${esEdicion ? 'Guardar cambios' : 'Crear novedad'}
           </button>

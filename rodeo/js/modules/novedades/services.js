@@ -106,11 +106,6 @@ export async function actualizarNovedad(id, campos) {
 }
 
 export async function eliminarNovedad(id) {
-  // El trigger novedades_set_updated_by valida que el usuario sea ADMINISTRADOR
-  // y setea deleted_by automáticamente.
-  const { error } = await supabase
-    .from('novedades_establecimiento')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('id', id);
+  const { error } = await supabase.rpc('soft_delete_novedad', { novedad_id: id });
   if (error) throw error;
 }
