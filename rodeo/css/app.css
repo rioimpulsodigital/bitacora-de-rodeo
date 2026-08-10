@@ -43,6 +43,10 @@
   background: rgba(255,255,255,0.15);
   color: #fff;
 }
+.rodeo-header-establecimiento select option {
+  color: #222;
+  background: #fff;
+}
 .rodeo-header-establecimiento span { color: rgba(255,255,255,0.85); font-size: 13px; }
 
 .rodeo-header-user {
