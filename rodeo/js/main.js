@@ -26,15 +26,17 @@ async function iniciar() {
   const session = await requireSession('../login.html');
   if (!session) return;
 
-  const perfil = await getPerfilActual();
+  const [perfil, establecimientos] = await Promise.all([
+    getPerfilActual(),
+    getEstablecimientosAccesibles(),
+  ]);
+
   if (!perfil) {
     renderSinPerfil();
     return;
   }
 
   renderHeaderUsuario(perfil, handleSignOut);
-
-  const establecimientos = await getEstablecimientosAccesibles();
   let activoId = getEstablecimientoActivoId();
   if (!activoId || !establecimientos.some((e) => e.id === activoId)) {
     activoId = establecimientos[0]?.id ?? null;
