@@ -197,11 +197,19 @@ export async function mountAnimalForm(contenedor, ctx, id) {
       if (animal) {
         await actualizarAnimal(animal.id, campos);
         await actualizarLoteDeAnimal(animal.id, loteId);
+        location.hash = '#animales';
       } else {
         const nuevo = await crearAnimal(campos);
         if (loteId) await actualizarLoteDeAnimal(nuevo.id, loteId);
+        const returnTo = sessionStorage.getItem('_atenciones_return');
+        if (returnTo) {
+          sessionStorage.setItem('_atenciones_animal_id', nuevo.id);
+          sessionStorage.removeItem('_atenciones_return');
+          location.hash = '#' + returnTo;
+        } else {
+          location.hash = '#animales';
+        }
       }
-      location.hash = '#animales';
     } catch (err) {
       errorEl.textContent = 'Error al guardar: ' + err.message;
     }
