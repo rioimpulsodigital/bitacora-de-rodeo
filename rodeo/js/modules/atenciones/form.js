@@ -192,7 +192,7 @@ export async function mountAtencionForm(contenedor, ctx, id) {
             ${lotesOpts}
           </select>
 
-          <label class="form-label">Visita relacionada (opcional)</label>
+          <label class="form-label">Visita de terreno relacionada (opcional)</label>
           <select class="form-field" name="visita_id">
             ${visitasOpts}
           </select>
