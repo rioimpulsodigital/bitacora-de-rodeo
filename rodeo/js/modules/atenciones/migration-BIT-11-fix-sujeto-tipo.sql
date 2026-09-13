@@ -1,0 +1,112 @@
+-- BIT-11 — Corrección de NOT NULL legacy en atenciones_clinicas.sujeto_tipo
+-- EJECUTAR CON CLAUDY en Supabase SQL Editor — Producción
+--
+-- CONTEXTO
+-- Al guardar una nueva Atención desde la UI, Producción devuelve:
+--   null value in column "sujeto_tipo" of relation "atenciones_clinicas"
+--   violates not-null constraint
+--
+-- `sujeto_tipo` es una columna del modelo legacy (mismo patrón que usa
+-- Observaciones: sujeto_tipo + animal_id/lote_id, donde el sujeto podía ser
+-- de un tipo u otro). El módulo de Atenciones Clínicas de BIT-11 NUNCA la
+-- referencia:
+--   - No aparece en rodeo/js/modules/atenciones/form.js
+--   - No aparece en rodeo/js/modules/atenciones/services.js (ni crearAtencion
+--     ni actualizarAtencion la incluyen en el payload)
+--   - No aparece en rodeo/js/modules/atenciones/list.js
+--   - No aparece en ninguna policy RLS de migration-BIT-11.sql
+--   - No aparece en el trigger atenciones_clinicas_set_updated_by()
+--     (solo toca updated_by/updated_at)
+-- Es decir: `sujeto_tipo` no forma parte del modelo funcional de BIT-11.
+-- El frontend nunca la va a enviar, así que la NOT NULL actual bloquea
+-- cualquier INSERT nuevo.
+--
+-- No se versionó nunca una CREATE TABLE de atenciones_clinicas en este repo
+-- (la tabla ya existía en Producción antes de BIT-11), así que no hay forma
+-- de confirmar desde el código si existen constraints/índices/FKs propios
+-- de sujeto_tipo sin consultarlo en vivo. Por eso el Paso 1 es obligatorio
+-- antes de aplicar la corrección.
+--
+-- Preferencia acordada: si hay razones para mantener compatibilidad
+-- histórica, dejar la columna NULLABLE (no eliminarla). NO se elimina la
+-- columna en este script.
+
+-- ── PASO 1 (OBLIGATORIO, SOLO LECTURA) ──────────────────────────────────────
+-- Ejecutar y documentar el resultado en BIT-11 (Notion) antes de aplicar
+-- nada. Si aparece cualquier CHECK, índice o FK atado a sujeto_tipo que no
+-- esperábamos, DETENERSE y reportar antes de continuar.
+--
+--   -- Nullability y tipo actuales:
+--   SELECT column_name, is_nullable, data_type, udt_name
+--   FROM information_schema.columns
+--   WHERE table_name = 'atenciones_clinicas' AND column_name = 'sujeto_tipo';
+--
+--   -- CHECK constraints que mencionen sujeto_tipo (más allá del ya eliminado
+--   -- chk_sujeto_unico -- confirmar que efectivamente ya no existe):
+--   SELECT conname, contype, pg_get_constraintdef(oid) AS definicion
+--   FROM pg_constraint
+--   WHERE conrelid = 'atenciones_clinicas'::regclass
+--     AND pg_get_constraintdef(oid) ILIKE '%sujeto_tipo%';
+--
+--   -- Índices que involucren sujeto_tipo:
+--   SELECT indexname, indexdef
+--   FROM pg_indexes
+--   WHERE tablename = 'atenciones_clinicas'
+--     AND indexdef ILIKE '%sujeto_tipo%';
+--
+--   -- Triggers de la tabla (confirmar que ninguno depende de sujeto_tipo):
+--   SELECT tgname, pg_get_triggerdef(oid) AS definicion
+--   FROM pg_trigger
+--   WHERE tgrelid = 'atenciones_clinicas'::regclass AND NOT tgisinternal;
+--
+--   -- FKs que tengan a sujeto_tipo como columna:
+--   SELECT tc.constraint_name, kcu.column_name
+--   FROM information_schema.table_constraints tc
+--   JOIN information_schema.key_column_usage kcu
+--     ON tc.constraint_name = kcu.constraint_name
+--   WHERE tc.table_name = 'atenciones_clinicas'
+--     AND tc.constraint_type = 'FOREIGN KEY'
+--     AND kcu.column_name = 'sujeto_tipo';
+
+-- ── PASO 2 — CORRECCIÓN (idempotente, cambio mínimo) ────────────────────────
+-- Solo quitar la restricción NOT NULL. No se toca el tipo de dato, no se
+-- elimina la columna, no se le asigna DEFAULT.
+
+ALTER TABLE atenciones_clinicas ALTER COLUMN sujeto_tipo DROP NOT NULL;
+
+-- ── PASO 3 (OBLIGATORIO) — VALIDAR EN TRANSACCIÓN ANTES DE COMMITEAR ────────
+-- BEGIN;
+--
+--   -- (Paso 2 ya aplicado más arriba en esta misma sesión/transacción)
+--
+--   -- Caso 1 — INSERT válido con animal_id y SIN sujeto_tipo → DEBE PASAR:
+--   INSERT INTO atenciones_clinicas
+--     (establecimiento_id, animal_id, profesional_responsable_id, fecha, hora, motivo, antecedentes, diagnostico)
+--   VALUES
+--     ('<establecimiento_id>', '<animal_id>', '<profesional_id>', current_date, current_time, 'test sujeto_tipo', 'test', 'test')
+--   RETURNING id, sujeto_tipo, estado; -- sujeto_tipo debe venir NULL, estado 'abierta' (ver migración de DEFAULT)
+--
+--   -- Caso 2 — animal_id NULL → DEBE SEGUIR FALLANDO (por
+--   -- chk_atenciones_animal_obligatorio, no por sujeto_tipo):
+--   -- INSERT INTO atenciones_clinicas
+--   --   (establecimiento_id, animal_id, profesional_responsable_id, fecha, hora, motivo, antecedentes, diagnostico)
+--   -- VALUES
+--   --   ('<establecimiento_id>', NULL, '<profesional_id>', current_date, current_time, 'test', 'test', 'test');
+--
+--   -- Caso 3 — animal_id + lote_id → DEBE PASAR:
+--   INSERT INTO atenciones_clinicas
+--     (establecimiento_id, animal_id, lote_id, profesional_responsable_id, fecha, hora, motivo, antecedentes, diagnostico)
+--   VALUES
+--     ('<establecimiento_id>', '<animal_id>', '<lote_id>', '<profesional_id>', current_date, current_time, 'test sujeto_tipo + lote', 'test', 'test')
+--   RETURNING id, sujeto_tipo, lote_id;
+--
+--   -- Caso 4 — confirmar que RLS sigue intacta (repetir SELECT con cada rol
+--   -- de prueba disponible; no se modificó ninguna policy en este script).
+--
+-- ROLLBACK; -- no dejar registros de prueba en Producción
+
+-- ── VERIFICACIÓN POST-APLICACIÓN (SOLO LECTURA) ─────────────────────────────
+--   SELECT column_name, is_nullable
+--   FROM information_schema.columns
+--   WHERE table_name = 'atenciones_clinicas' AND column_name = 'sujeto_tipo';
+--   -- Debe devolver is_nullable = 'YES'
