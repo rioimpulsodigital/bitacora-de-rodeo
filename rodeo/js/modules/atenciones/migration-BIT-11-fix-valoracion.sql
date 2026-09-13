@@ -1,0 +1,117 @@
+-- BIT-11 — Corrección de NOT NULL legacy en atenciones_clinicas.valoracion
+-- EJECUTAR CON CLAUDY en Supabase SQL Editor — Producción
+--
+-- CONTEXTO
+-- Al guardar una nueva Atención desde la UI, Producción devuelve:
+--   null value in column "valoracion" of relation "atenciones_clinicas"
+--   violates not-null constraint
+--
+-- `valoracion` es una columna del modelo legacy de atenciones_clinicas,
+-- confirmada por el diagnóstico original de Claudy (29 Ago 2026, ver
+-- encabezado de migration-BIT-11.sql: "profesional_responsable_id, medio,
+-- fecha, valoracion, es_preliminar, ..."). Junto con `medio` y
+-- `es_preliminar`, son columnas que ya existían en Producción antes de
+-- BIT-11 y que el módulo nuevo nunca adoptó.
+--
+-- Búsqueda en todo el repo: `valoracion` NO aparece en:
+--   - rodeo/js/modules/atenciones/form.js
+--   - rodeo/js/modules/atenciones/services.js (ni crearAtencion ni
+--     actualizarAtencion la incluyen en el payload)
+--   - rodeo/js/modules/atenciones/list.js
+--   - ninguna policy RLS de migration-BIT-11.sql
+--   - el trigger atenciones_clinicas_set_updated_by()
+--   - ningún otro módulo del proyecto (Jornadas, Animales, Visitas,
+--     Observaciones, Novedades)
+-- La única mención en todo el repo es el comentario de diagnóstico citado
+-- arriba. No forma parte del formulario ni del modelo funcional vigente de
+-- BIT-11 (motivo, antecedentes, examen, diagnóstico, tratamiento,
+-- exámenes/estudios, observaciones, próxima visita, estado).
+--
+-- Igual que con sujeto_tipo: no existe un CREATE TABLE versionado de
+-- atenciones_clinicas en este repo, así que no se puede confirmar desde el
+-- código si `valoracion` tiene CHECK/índice/FK propios sin consultarlo en
+-- vivo. El Paso 1 es obligatorio antes de aplicar la corrección.
+--
+-- Preferencia acordada: NO eliminar la columna todavía, solo quitar la
+-- restricción NOT NULL (cambio mínimo y reversible).
+
+-- ── PASO 1 (OBLIGATORIO, SOLO LECTURA) ──────────────────────────────────────
+-- Ejecutar y documentar el resultado en BIT-11 (Notion) antes de aplicar
+-- nada. Si aparece cualquier CHECK, índice, trigger o FK atado a
+-- `valoracion` que no esperábamos, DETENERSE y reportar antes de continuar.
+--
+--   -- Tipo, nullability y default actuales:
+--   SELECT column_name, is_nullable, data_type, udt_name, column_default
+--   FROM information_schema.columns
+--   WHERE table_name = 'atenciones_clinicas' AND column_name = 'valoracion';
+--
+--   -- CHECK constraints que mencionen valoracion:
+--   SELECT conname, contype, pg_get_constraintdef(oid) AS definicion
+--   FROM pg_constraint
+--   WHERE conrelid = 'atenciones_clinicas'::regclass
+--     AND pg_get_constraintdef(oid) ILIKE '%valoracion%';
+--
+--   -- Índices que involucren valoracion:
+--   SELECT indexname, indexdef
+--   FROM pg_indexes
+--   WHERE tablename = 'atenciones_clinicas'
+--     AND indexdef ILIKE '%valoracion%';
+--
+--   -- Triggers de la tabla (confirmar que ninguno depende de valoracion):
+--   SELECT tgname, pg_get_triggerdef(oid) AS definicion
+--   FROM pg_trigger
+--   WHERE tgrelid = 'atenciones_clinicas'::regclass AND NOT tgisinternal;
+--
+--   -- FKs que tengan a valoracion como columna:
+--   SELECT tc.constraint_name, kcu.column_name
+--   FROM information_schema.table_constraints tc
+--   JOIN information_schema.key_column_usage kcu
+--     ON tc.constraint_name = kcu.constraint_name
+--   WHERE tc.table_name = 'atenciones_clinicas'
+--     AND tc.constraint_type = 'FOREIGN KEY'
+--     AND kcu.column_name = 'valoracion';
+
+-- ── PASO 2 — CORRECCIÓN (idempotente, cambio mínimo) ────────────────────────
+-- Solo quitar la restricción NOT NULL. No se toca el tipo de dato, no se
+-- elimina la columna, no se le asigna DEFAULT.
+
+ALTER TABLE atenciones_clinicas ALTER COLUMN valoracion DROP NOT NULL;
+
+-- ── PASO 3 (OBLIGATORIO) — VALIDAR EN TRANSACCIÓN ANTES DE COMMITEAR ────────
+-- BEGIN;
+--
+--   -- (Paso 2 ya aplicado más arriba en esta misma sesión/transacción)
+--
+--   -- Caso A — INSERT válido con valoracion NULL → DEBE PASAR:
+--   INSERT INTO atenciones_clinicas
+--     (establecimiento_id, animal_id, profesional_responsable_id, fecha, hora, motivo, antecedentes, diagnostico)
+--   VALUES
+--     ('<establecimiento_id>', '<animal_id>', '<profesional_id>', current_date, current_time, 'test valoracion', 'test', 'test')
+--   RETURNING id, valoracion, sujeto_tipo, estado;
+--   -- valoracion debe venir NULL, sujeto_tipo NULL, estado 'abierta'.
+--
+--   -- Caso B — animal_id NULL → DEBE SEGUIR FALLANDO (por
+--   -- chk_atenciones_animal_obligatorio, no por valoracion):
+--   -- INSERT INTO atenciones_clinicas
+--   --   (establecimiento_id, animal_id, profesional_responsable_id, fecha, hora, motivo, antecedentes, diagnostico)
+--   -- VALUES
+--   --   ('<establecimiento_id>', NULL, '<profesional_id>', current_date, current_time, 'test', 'test', 'test');
+--
+--   -- Caso C — animal + lote + sujeto_tipo NULL + valoracion NULL → DEBE PASAR:
+--   INSERT INTO atenciones_clinicas
+--     (establecimiento_id, animal_id, lote_id, profesional_responsable_id, fecha, hora, motivo, antecedentes, diagnostico)
+--   VALUES
+--     ('<establecimiento_id>', '<animal_id>', '<lote_id>', '<profesional_id>', current_date, current_time, 'test valoracion + lote', 'test', 'test')
+--   RETURNING id, valoracion, sujeto_tipo, lote_id;
+--
+--   -- Caso D — estado omitido → debe tomar 'abierta' (ya confirmado por
+--   -- migration-BIT-11-fix-estado-default.sql, se revalida acá de paso):
+--   -- ver columna "estado" en los RETURNING de los casos A y C de arriba.
+--
+-- ROLLBACK; -- no dejar registros de prueba en Producción
+
+-- ── VERIFICACIÓN POST-APLICACIÓN (SOLO LECTURA) ─────────────────────────────
+--   SELECT column_name, is_nullable
+--   FROM information_schema.columns
+--   WHERE table_name = 'atenciones_clinicas' AND column_name = 'valoracion';
+--   -- Debe devolver is_nullable = 'YES'
