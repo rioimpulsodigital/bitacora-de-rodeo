@@ -5,7 +5,13 @@ function tieneRol(perfil, rol) {
   return perfil.rol === rol;
 }
 
-function fmt(isoDate) {
+function toDateOnly(value) {
+  if (!value) return '';
+  return String(value).split('T')[0];
+}
+
+function fmt(value) {
+  const isoDate = toDateOnly(value);
   if (!isoDate) return '—';
   const [y, m, d] = isoDate.split('-');
   return `${d}/${m}/${y}`;

@@ -13,7 +13,13 @@ function tieneRol(perfil, rol) {
   return perfil.rol === rol;
 }
 
-function fmt(isoDate) {
+function toDateOnly(value) {
+  if (!value) return '';
+  return String(value).split('T')[0];
+}
+
+function fmt(value) {
+  const isoDate = toDateOnly(value);
   if (!isoDate) return '—';
   const [y, m, d] = isoDate.split('-');
   return `${d}/${m}/${y}`;
@@ -196,7 +202,7 @@ export async function mountAtencionForm(contenedor, ctx, id) {
           <div style="display:flex;gap:12px">
             <div style="flex:1">
               <label class="form-label">Fecha <span class="rodeo-required">*</span></label>
-              <input class="form-field" type="date" name="fecha" value="${atencion?.fecha ?? hoy}" required>
+              <input class="form-field" type="date" name="fecha" value="${toDateOnly(atencion?.fecha) || hoy}" required>
             </div>
             <div style="flex:1">
               <label class="form-label">Hora <span class="rodeo-required">*</span></label>
@@ -228,7 +234,7 @@ export async function mountAtencionForm(contenedor, ctx, id) {
           ${estadoHtml}
 
           <label class="form-label" style="margin-top:${esEdicion ? '12px' : '0'}">Próxima visita (opcional)</label>
-          <input class="form-field" type="date" name="proxima_visita" value="${atencion?.proxima_visita ?? ''}">
+          <input class="form-field" type="date" name="proxima_visita" value="${toDateOnly(atencion?.proxima_visita)}">
 
           <p class="form-hint" style="color:var(--faint);font-size:12px;margin:-6px 0 14px">
             📎 Adjuntos fotográficos: disponibles en una próxima versión (BIT-13).
