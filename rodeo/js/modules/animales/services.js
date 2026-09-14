@@ -16,27 +16,22 @@ export async function listPersonas() {
   return data;
 }
 
-// Crea la persona e inmediatamente la vincula al establecimiento activo en
-// personas_establecimientos, para que sea visible por RLS a PROFESIONAL/OPERADOR_CAMPO.
+// Crea la persona y su vínculo al establecimiento en una sola operación
+// atómica vía RPC (crear_persona_con_establecimiento, SECURITY DEFINER).
+// La función valida tiene_acceso_establecimiento() del lado del servidor
+// antes de escribir nada -- personas no tiene establecimiento_id propio,
+// así que ese control no puede hacerse con una policy de INSERT directa.
 export async function crearPersona(campos, establecimientoId) {
-  const { data: persona, error: e1 } = await supabase
-    .from('personas')
-    .insert({
-      nombre: campos.nombre.trim(),
-      telefono: campos.telefono?.trim() || null,
-      email: campos.email?.trim() || null,
+  const { data, error } = await supabase
+    .rpc('crear_persona_con_establecimiento', {
+      p_nombre: campos.nombre.trim(),
+      p_telefono: campos.telefono?.trim() || null,
+      p_email: campos.email?.trim() || null,
+      p_establecimiento_id: establecimientoId,
     })
-    .select('id, nombre')
     .single();
-  if (e1) throw e1;
-
-  if (establecimientoId) {
-    const { error: e2 } = await supabase
-      .from('personas_establecimientos')
-      .insert({ persona_id: persona.id, establecimiento_id: establecimientoId });
-    if (e2) throw e2;
-  }
-  return persona;
+  if (error) throw error;
+  return data;
 }
 
 // ── Lotes ───────────────────────────────────────────────────────

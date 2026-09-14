@@ -2,43 +2,49 @@
 -- Corrección de RLS en `personas` (Tutor Responsable) que bloquea el INSERT
 -- EJECUTAR CON CLAUDY en Supabase SQL Editor — Producción
 --
+-- ACTUALIZADO — decisión funcional de Brenda/IAn: reemplaza la propuesta
+-- anterior de este archivo (policy de INSERT directa sobre `personas`).
+-- Esa propuesta quedó descartada: se decidió NO abrir una policy global de
+-- INSERT sobre `personas` sin control contextual, y en su lugar usar una
+-- RPC atómica que valida el establecimiento antes de escribir nada.
+--
 -- CONTEXTO
 -- Flujo: Nueva Atención → + Nuevo Paciente → Nuevo Paciente Animal →
 -- + Crear nuevo tutor → Guardar tutor. Producción devuelve:
 --   new row violates row-level security policy for table "personas"
 --
 -- Esto bloquea el flujo obligatorio de BIT-11 (crear paciente → volver a
--- la Atención → paciente preseleccionado), porque el paciente exige un
--- Tutor Responsable y hoy no se puede crear uno nuevo con un usuario
--- PROFESIONAL real.
+-- la Atención → paciente preseleccionado).
 --
--- CÓMO CREA TUTORES EL FRONTEND HOY (rodeo/js/modules/animales/services.js,
--- función crearPersona, usada desde rodeo/js/modules/animales/form.js):
---   1) INSERT en `personas` (nombre, telefono, email) -- SIN establecimiento_id,
---      porque esa columna no existe en `personas` (confirmado por el código:
---      ni crearPersona ni getAnimal/listPersonas la referencian).
---   2) Si el INSERT anterior tiene éxito, INSERT en `personas_establecimientos`
---      (persona_id, establecimiento_id) para vincular la persona al
---      establecimiento activo -- este segundo paso es el que sí puede
---      scopearse por establecimiento_id.
--- El error reportado ocurre en el PASO 1 (personas), antes de llegar al
--- paso 2. Es decir: el problema es autorizar el INSERT en una tabla que,
--- por diseño, no tiene establecimiento_id propio -- no hay forma de exigir
--- tiene_acceso_establecimiento() sobre esta tabla en el momento del INSERT,
--- porque la fila (y su vínculo a un establecimiento) todavía no existe.
+-- DECISIÓN FUNCIONAL VIGENTE (Brenda/IAn): crear Pacientes/Tutores NO es
+-- una acción clínica exclusiva de PROFESIONAL. En V1 pueden crear
+-- Pacientes/Tutores los 3 roles -- ADMINISTRADOR, PROFESIONAL,
+-- OPERADOR_CAMPO -- siempre dentro de un establecimiento al que el
+-- usuario tenga acceso. Coincide con que el frontend de Animales no filtra
+-- por rol hoy (a diferencia de Atenciones Clínicas).
 --
--- El módulo Animales (rodeo/js/modules/animales/) NO tiene ningún gate de
--- rol en el frontend: "+ Nuevo Paciente" y "+ Crear nuevo tutor" están
--- disponibles para cualquier usuario autenticado (PROFESIONAL,
--- ADMINISTRADOR, y también OPERADOR_CAMPO -- a diferencia de Atenciones
--- Clínicas, que sí es exclusiva de PROFESIONAL/ADMINISTRADOR por spec de
--- BIT-11). Si la policy de `personas` se restringe solo a
--- PROFESIONAL/ADMINISTRADOR, se bloquearía una capacidad que hoy el
--- frontend ya expone a OPERADOR_CAMPO -- ver "DECISIÓN REQUERIDA" abajo.
+-- POR QUÉ UNA RPC Y NO UNA POLICY DIRECTA
+-- `personas` no tiene establecimiento_id propio (confirmado por el código:
+-- ni crearPersona ni getAnimal/listPersonas la referencian). El vínculo a
+-- un establecimiento se crea recién en un segundo INSERT, sobre
+-- `personas_establecimientos`. Eso significa que una policy de INSERT
+-- directa sobre `personas` NUNCA puede validar
+-- tiene_acceso_establecimiento() en el momento de crear la fila -- solo
+-- puede autorizar "cualquier usuario válido", sin contexto de a qué
+-- establecimiento va a terminar asociada esa persona. Eso es exactamente
+-- la "policy global sin control contextual" que se pidió evitar.
 --
--- No existe ningún CREATE TABLE/policy de `personas` ni `personas_establecimientos`
--- versionado en este repo (se crearon directamente en Supabase, igual que
--- atenciones_clinicas antes de BIT-11), así que el Paso 1 (diagnóstico) es
+-- La alternativa segura: una función RPC SECURITY DEFINER que recibe el
+-- establecimiento_id como parámetro explícito, valida
+-- tiene_acceso_establecimiento(p_establecimiento_id) ANTES de escribir
+-- nada, y hace los dos INSERT (personas + personas_establecimientos) en
+-- una sola operación atómica. `personas` y `personas_establecimientos`
+-- NO necesitan una policy de INSERT abierta a clientes: la única vía de
+-- escritura pasa por esta función.
+--
+-- No existe ningún CREATE TABLE/policy de `personas` ni
+-- `personas_establecimientos` versionado en este repo (se crearon
+-- directamente en Supabase), así que el Paso 1 (diagnóstico) sigue siendo
 -- obligatorio antes de tocar nada.
 
 -- ── PASO 1 (OBLIGATORIO, SOLO LECTURA) ──────────────────────────────────────
@@ -63,78 +69,111 @@
 --   SELECT relname, relrowsecurity, relforcerowsecurity
 --   FROM pg_class WHERE relname IN ('personas', 'personas_establecimientos');
 --
--- Si aparece una policy de INSERT en `personas` que ya debería permitir
--- esto y el error persiste igual, DETENERSE -- puede ser otra causa (grant,
--- trigger, o un error real en otra columna) y no un problema de policy.
-
--- ── DECISIÓN REQUERIDA ANTES DEL PASO 2 ─────────────────────────────────────
--- ¿Quién debe poder crear una `persona` (Tutor Responsable) nueva?
+--   -- Grants directos de INSERT a `authenticated` sobre ambas tablas
+--   -- (si existen, quedan huérfanos una vez que se adopta la RPC -- ver
+--   -- nota al final del Paso 2):
+--   SELECT table_name, privilege_type
+--   FROM information_schema.role_table_grants
+--   WHERE table_name IN ('personas', 'personas_establecimientos')
+--     AND grantee = 'authenticated';
 --
---   Opción A (alcance amplio, coincide con el frontend actual sin gate de
---   rol): cualquier usuario autenticado con perfil activo, sin importar
---   su rol -- PROFESIONAL, ADMINISTRADOR u OPERADOR_CAMPO:
---     WITH CHECK (
---       EXISTS (SELECT 1 FROM perfiles p WHERE p.id = auth.uid() AND p.activo = true)
---     )
---
---   Opción B (alcance acotado a lo que pregunta este mensaje): solo
---   PROFESIONAL o ADMINISTRADOR:
---     WITH CHECK (get_mi_rol() IN ('PROFESIONAL', 'ADMINISTRADOR'))
---
--- Con la Opción B, OPERADOR_CAMPO dejaría de poder crear tutores nuevos
--- desde Nuevo Paciente -- una capacidad que hoy el frontend le expone sin
--- restricción (el módulo Animales no filtra por rol). Elegir B sería
--- ampliar una restricción nueva, no solo cerrar un agujero -- confirmar
--- con Brenda antes de aplicarla si se prefiere sobre la Opción A.
---
--- Este script aplica la Opción A por defecto (mínimo cambio de
--- comportamiento respecto de lo que el frontend ya permite hoy). Si se
--- decide la Opción B, reemplazar el WITH CHECK del Paso 2 antes de correrlo.
+-- Si algo de esto contradice lo asumido en este script (por ejemplo, si
+-- `personas` sí tiene una columna de scoping que no vimos en el código),
+-- DETENERSE y reportar antes de continuar.
 
--- ── PASO 2 — CORRECCIÓN (idempotente) ───────────────────────────────────────
--- Elimina únicamente una policy de INSERT en personas si existe (nombres
--- plausibles de intentos anteriores) y crea la policy mínima necesaria.
--- No se toca SELECT/UPDATE/DELETE de personas, ni ninguna policy de
--- personas_establecimientos (según el Paso 1, ese INSERT nunca llega a
--- ejecutarse hoy porque el bloqueo ocurre antes, en personas).
+-- ── PASO 2 — RPC ATÓMICA (idempotente vía CREATE OR REPLACE) ────────────────
+-- Crea la persona y su vínculo al establecimiento en una sola operación.
+-- SECURITY DEFINER: corre con privilegios del dueño de la función (igual
+-- que atenciones_clinicas_set_updated_by en migration-BIT-11.sql), por lo
+-- que sus INSERT internos no dependen de que exista una policy de INSERT
+-- abierta en personas/personas_establecimientos.
+-- search_path fijo para evitar que una tabla/función maliciosa en otro
+-- schema intercepte las referencias no calificadas.
 
-DROP POLICY IF EXISTS "personas_insert" ON personas;
+CREATE OR REPLACE FUNCTION crear_persona_con_establecimiento(
+  p_nombre text,
+  p_telefono text,
+  p_email text,
+  p_establecimiento_id uuid
+)
+RETURNS TABLE (id uuid, nombre text)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_persona_id uuid;
+BEGIN
+  IF p_establecimiento_id IS NULL OR NOT tiene_acceso_establecimiento(p_establecimiento_id) THEN
+    RAISE EXCEPTION 'Sin acceso al establecimiento indicado' USING ERRCODE = '42501';
+  END IF;
 
-CREATE POLICY "personas_insert" ON personas
-  FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM perfiles p WHERE p.id = auth.uid() AND p.activo = true)
-  );
+  IF p_nombre IS NULL OR btrim(p_nombre) = '' THEN
+    RAISE EXCEPTION 'El nombre es obligatorio' USING ERRCODE = '22023';
+  END IF;
 
--- Si el Paso 1 revela que personas_establecimientos también carece de una
--- policy de INSERT funcional, agregar (y solo entonces) algo equivalente a:
+  INSERT INTO personas (nombre, telefono, email)
+  VALUES (btrim(p_nombre), NULLIF(btrim(p_telefono), ''), NULLIF(btrim(p_email), ''))
+  RETURNING personas.id INTO v_persona_id;
+
+  -- Si esta segunda escritura falla (FK inválida, error inesperado, etc.),
+  -- toda la función aborta como una sola sentencia: no queda una fila en
+  -- personas sin su vínculo -- Postgres revierte ambos INSERT juntos.
+  INSERT INTO personas_establecimientos (persona_id, establecimiento_id)
+  VALUES (v_persona_id, p_establecimiento_id);
+
+  RETURN QUERY SELECT p.id, p.nombre FROM personas p WHERE p.id = v_persona_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION crear_persona_con_establecimiento(text, text, text, uuid) TO authenticated;
+
+-- No se crea ninguna policy de INSERT sobre personas ni sobre
+-- personas_establecimientos. Si el Paso 1 encuentra grants directos de
+-- INSERT a `authenticated` sobre cualquiera de las dos tablas, revisar con
+-- Brenda si conviene revocarlos para que la RPC sea la única vía de
+-- escritura (recomendado, pero no incluido acá como acción automática
+-- porque no sabemos si algo más del sistema depende de esos grants):
 --
--- DROP POLICY IF EXISTS "personas_establecimientos_insert" ON personas_establecimientos;
--- CREATE POLICY "personas_establecimientos_insert" ON personas_establecimientos
---   FOR INSERT WITH CHECK (tiene_acceso_establecimiento(establecimiento_id));
+-- REVOKE INSERT ON personas TO authenticated;
+-- REVOKE INSERT ON personas_establecimientos TO authenticated;
 
 -- ── PASO 3 (OBLIGATORIO) — VALIDAR EN TRANSACCIÓN ANTES DE COMMITEAR ────────
--- Ejecutar como el usuario PROFESIONAL real (o simulando su auth.uid()
--- según el método que use Claudy para probar RLS), NO como service role.
+-- Ejecutar como cada uno de los 3 roles reales disponibles (no como
+-- service role, para que la prueba sea representativa de RLS real).
 --
 -- BEGIN;
 --
 --   -- (Paso 2 ya aplicado más arriba en esta misma sesión/transacción)
 --
---   -- Caso 1 -- INSERT de una persona nueva como PROFESIONAL → DEBE PASAR:
---   INSERT INTO personas (nombre, telefono, email)
---   VALUES ('Tutor Demo RLS', NULL, NULL)
---   RETURNING id, nombre;
+--   -- Caso 1 -- PROFESIONAL, establecimiento autorizado → DEBE PASAR:
+--   SELECT * FROM crear_persona_con_establecimiento(
+--     'Tutor Demo RLS - PROFESIONAL', NULL, NULL, '<establecimiento_autorizado_id>'
+--   );
 --
---   -- Caso 2 -- vincular esa persona al establecimiento activo → DEBE PASAR
---   -- (usa el id devuelto arriba):
---   -- INSERT INTO personas_establecimientos (persona_id, establecimiento_id)
---   -- VALUES ('<id_devuelto>', '<establecimiento_id>');
+--   -- Caso 2 -- ADMINISTRADOR, establecimiento autorizado → DEBE PASAR
+--   -- (repetir con sesión de ADMINISTRADOR).
 --
---   -- Caso 3 -- confirmar que SELECT/UPDATE/DELETE de personas no cambiaron
---   -- de comportamiento (repetir alguna consulta ya usada antes del fix).
+--   -- Caso 3 -- OPERADOR_CAMPO, establecimiento autorizado → DEBE PASAR
+--   -- (repetir con sesión de OPERADOR_CAMPO).
+--
+--   -- Caso 4 -- cualquier rol, establecimiento NO autorizado → DEBE FALLAR
+--   -- con "Sin acceso al establecimiento indicado":
+--   -- SELECT * FROM crear_persona_con_establecimiento(
+--   --   'No debería crearse', NULL, NULL, '<establecimiento_no_autorizado_id>'
+--   -- );
+--
+--   -- Caso 5 -- confirmar que el Caso 4 no dejó una fila huérfana en
+--   -- personas (debe dar 0):
+--   -- SELECT COUNT(*) FROM personas WHERE nombre = 'No debería crearse';
 --
 -- ROLLBACK; -- no dejar registros de prueba en Producción
 
 -- ── VERIFICACIÓN POST-APLICACIÓN (SOLO LECTURA) ─────────────────────────────
---   SELECT policyname, cmd, with_check
---   FROM pg_policies WHERE tablename = 'personas';
+--   SELECT proname, prosecdef FROM pg_proc WHERE proname = 'crear_persona_con_establecimiento';
+--   -- prosecdef debe ser true (SECURITY DEFINER activo)
+--
+--   SELECT grantee, privilege_type
+--   FROM information_schema.role_routine_grants
+--   WHERE routine_name = 'crear_persona_con_establecimiento';
+--   -- authenticated debe tener EXECUTE
