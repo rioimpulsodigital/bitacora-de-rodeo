@@ -1,0 +1,140 @@
+-- Descubierto vía BIT-11, pero la tabla pertenece al módulo Animales (BIT-07)
+-- Corrección de RLS en `personas` (Tutor Responsable) que bloquea el INSERT
+-- EJECUTAR CON CLAUDY en Supabase SQL Editor — Producción
+--
+-- CONTEXTO
+-- Flujo: Nueva Atención → + Nuevo Paciente → Nuevo Paciente Animal →
+-- + Crear nuevo tutor → Guardar tutor. Producción devuelve:
+--   new row violates row-level security policy for table "personas"
+--
+-- Esto bloquea el flujo obligatorio de BIT-11 (crear paciente → volver a
+-- la Atención → paciente preseleccionado), porque el paciente exige un
+-- Tutor Responsable y hoy no se puede crear uno nuevo con un usuario
+-- PROFESIONAL real.
+--
+-- CÓMO CREA TUTORES EL FRONTEND HOY (rodeo/js/modules/animales/services.js,
+-- función crearPersona, usada desde rodeo/js/modules/animales/form.js):
+--   1) INSERT en `personas` (nombre, telefono, email) -- SIN establecimiento_id,
+--      porque esa columna no existe en `personas` (confirmado por el código:
+--      ni crearPersona ni getAnimal/listPersonas la referencian).
+--   2) Si el INSERT anterior tiene éxito, INSERT en `personas_establecimientos`
+--      (persona_id, establecimiento_id) para vincular la persona al
+--      establecimiento activo -- este segundo paso es el que sí puede
+--      scopearse por establecimiento_id.
+-- El error reportado ocurre en el PASO 1 (personas), antes de llegar al
+-- paso 2. Es decir: el problema es autorizar el INSERT en una tabla que,
+-- por diseño, no tiene establecimiento_id propio -- no hay forma de exigir
+-- tiene_acceso_establecimiento() sobre esta tabla en el momento del INSERT,
+-- porque la fila (y su vínculo a un establecimiento) todavía no existe.
+--
+-- El módulo Animales (rodeo/js/modules/animales/) NO tiene ningún gate de
+-- rol en el frontend: "+ Nuevo Paciente" y "+ Crear nuevo tutor" están
+-- disponibles para cualquier usuario autenticado (PROFESIONAL,
+-- ADMINISTRADOR, y también OPERADOR_CAMPO -- a diferencia de Atenciones
+-- Clínicas, que sí es exclusiva de PROFESIONAL/ADMINISTRADOR por spec de
+-- BIT-11). Si la policy de `personas` se restringe solo a
+-- PROFESIONAL/ADMINISTRADOR, se bloquearía una capacidad que hoy el
+-- frontend ya expone a OPERADOR_CAMPO -- ver "DECISIÓN REQUERIDA" abajo.
+--
+-- No existe ningún CREATE TABLE/policy de `personas` ni `personas_establecimientos`
+-- versionado en este repo (se crearon directamente en Supabase, igual que
+-- atenciones_clinicas antes de BIT-11), así que el Paso 1 (diagnóstico) es
+-- obligatorio antes de tocar nada.
+
+-- ── PASO 1 (OBLIGATORIO, SOLO LECTURA) ──────────────────────────────────────
+-- Documentar el resultado en BIT-11 (Notion) antes de aplicar nada.
+--
+--   -- Políticas actuales de personas:
+--   SELECT policyname, cmd, qual, with_check
+--   FROM pg_policies WHERE tablename = 'personas';
+--
+--   -- Políticas actuales de personas_establecimientos:
+--   SELECT policyname, cmd, qual, with_check
+--   FROM pg_policies WHERE tablename = 'personas_establecimientos';
+--
+--   -- Confirmar que personas NO tiene establecimiento_id (ni ninguna otra
+--   -- columna de scoping):
+--   SELECT column_name, data_type
+--   FROM information_schema.columns
+--   WHERE table_name = 'personas'
+--   ORDER BY ordinal_position;
+--
+--   -- RLS habilitado/forzado en ambas tablas:
+--   SELECT relname, relrowsecurity, relforcerowsecurity
+--   FROM pg_class WHERE relname IN ('personas', 'personas_establecimientos');
+--
+-- Si aparece una policy de INSERT en `personas` que ya debería permitir
+-- esto y el error persiste igual, DETENERSE -- puede ser otra causa (grant,
+-- trigger, o un error real en otra columna) y no un problema de policy.
+
+-- ── DECISIÓN REQUERIDA ANTES DEL PASO 2 ─────────────────────────────────────
+-- ¿Quién debe poder crear una `persona` (Tutor Responsable) nueva?
+--
+--   Opción A (alcance amplio, coincide con el frontend actual sin gate de
+--   rol): cualquier usuario autenticado con perfil activo, sin importar
+--   su rol -- PROFESIONAL, ADMINISTRADOR u OPERADOR_CAMPO:
+--     WITH CHECK (
+--       EXISTS (SELECT 1 FROM perfiles p WHERE p.id = auth.uid() AND p.activo = true)
+--     )
+--
+--   Opción B (alcance acotado a lo que pregunta este mensaje): solo
+--   PROFESIONAL o ADMINISTRADOR:
+--     WITH CHECK (get_mi_rol() IN ('PROFESIONAL', 'ADMINISTRADOR'))
+--
+-- Con la Opción B, OPERADOR_CAMPO dejaría de poder crear tutores nuevos
+-- desde Nuevo Paciente -- una capacidad que hoy el frontend le expone sin
+-- restricción (el módulo Animales no filtra por rol). Elegir B sería
+-- ampliar una restricción nueva, no solo cerrar un agujero -- confirmar
+-- con Brenda antes de aplicarla si se prefiere sobre la Opción A.
+--
+-- Este script aplica la Opción A por defecto (mínimo cambio de
+-- comportamiento respecto de lo que el frontend ya permite hoy). Si se
+-- decide la Opción B, reemplazar el WITH CHECK del Paso 2 antes de correrlo.
+
+-- ── PASO 2 — CORRECCIÓN (idempotente) ───────────────────────────────────────
+-- Elimina únicamente una policy de INSERT en personas si existe (nombres
+-- plausibles de intentos anteriores) y crea la policy mínima necesaria.
+-- No se toca SELECT/UPDATE/DELETE de personas, ni ninguna policy de
+-- personas_establecimientos (según el Paso 1, ese INSERT nunca llega a
+-- ejecutarse hoy porque el bloqueo ocurre antes, en personas).
+
+DROP POLICY IF EXISTS "personas_insert" ON personas;
+
+CREATE POLICY "personas_insert" ON personas
+  FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM perfiles p WHERE p.id = auth.uid() AND p.activo = true)
+  );
+
+-- Si el Paso 1 revela que personas_establecimientos también carece de una
+-- policy de INSERT funcional, agregar (y solo entonces) algo equivalente a:
+--
+-- DROP POLICY IF EXISTS "personas_establecimientos_insert" ON personas_establecimientos;
+-- CREATE POLICY "personas_establecimientos_insert" ON personas_establecimientos
+--   FOR INSERT WITH CHECK (tiene_acceso_establecimiento(establecimiento_id));
+
+-- ── PASO 3 (OBLIGATORIO) — VALIDAR EN TRANSACCIÓN ANTES DE COMMITEAR ────────
+-- Ejecutar como el usuario PROFESIONAL real (o simulando su auth.uid()
+-- según el método que use Claudy para probar RLS), NO como service role.
+--
+-- BEGIN;
+--
+--   -- (Paso 2 ya aplicado más arriba en esta misma sesión/transacción)
+--
+--   -- Caso 1 -- INSERT de una persona nueva como PROFESIONAL → DEBE PASAR:
+--   INSERT INTO personas (nombre, telefono, email)
+--   VALUES ('Tutor Demo RLS', NULL, NULL)
+--   RETURNING id, nombre;
+--
+--   -- Caso 2 -- vincular esa persona al establecimiento activo → DEBE PASAR
+--   -- (usa el id devuelto arriba):
+--   -- INSERT INTO personas_establecimientos (persona_id, establecimiento_id)
+--   -- VALUES ('<id_devuelto>', '<establecimiento_id>');
+--
+--   -- Caso 3 -- confirmar que SELECT/UPDATE/DELETE de personas no cambiaron
+--   -- de comportamiento (repetir alguna consulta ya usada antes del fix).
+--
+-- ROLLBACK; -- no dejar registros de prueba en Producción
+
+-- ── VERIFICACIÓN POST-APLICACIÓN (SOLO LECTURA) ─────────────────────────────
+--   SELECT policyname, cmd, with_check
+--   FROM pg_policies WHERE tablename = 'personas';

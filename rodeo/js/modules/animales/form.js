@@ -81,7 +81,7 @@ export async function mountAnimalForm(contenedor, ctx, id) {
         <input class="form-field" type="date" name="fecha_nacimiento" value="${animal?.fecha_nacimiento ?? ''}">
 
         <label class="form-label">Notas / Identificación (caravana, pelaje, etc.)</label>
-        <textarea class="act-textarea" name="notas" rows="3">${animal?.notas ? escapeHtml(animal.notas) : ''}</textarea>
+        <textarea class="act-textarea" name="notas" rows="3" style="width:100%;margin-bottom:16px">${animal?.notas ? escapeHtml(animal.notas) : ''}</textarea>
 
         <label class="form-label">Tutor Responsable <span class="rodeo-required">*</span></label>
         <select class="form-field" name="tutor_responsable_id" id="rodeo-tutor-select"
