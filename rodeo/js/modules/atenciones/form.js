@@ -253,6 +253,45 @@ export async function mountAtencionForm(contenedor, ctx, id) {
 
     const historialEl = document.getElementById('atencion-historial');
     const animalSelect = document.getElementById('atencion-animal');
+    const formEl = document.getElementById('atencion-form');
+    const submitBtn = document.getElementById('atencion-submit');
+    const textoBotonNormal = esEdicion ? 'Guardar cambios' : 'Guardar atención';
+
+    // Estado del botón: 'pristine' (sin cambios) | 'dirty' (hay cambios) |
+    // 'saving' | 'saved'. Arranca siempre 'pristine' -- precargar valores
+    // (fecha/hora automáticas, datos de la Atención en edición) no cuenta
+    // como cambio del usuario.
+    let estadoBoton = 'pristine';
+
+    function aplicarEstadoBoton() {
+      submitBtn.classList.remove('rodeo-btn-guardado');
+      if (estadoBoton === 'pristine') {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Sin cambios';
+      } else if (estadoBoton === 'dirty') {
+        submitBtn.disabled = false;
+        submitBtn.textContent = textoBotonNormal;
+      } else if (estadoBoton === 'saving') {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Guardando…';
+      } else if (estadoBoton === 'saved') {
+        submitBtn.disabled = true;
+        submitBtn.textContent = '✓ Guardado';
+        submitBtn.classList.add('rodeo-btn-guardado');
+      }
+    }
+
+    function marcarDirty() {
+      if (estadoBoton === 'saving') return; // no interrumpir un guardado en curso
+      if (estadoBoton !== 'dirty') {
+        estadoBoton = 'dirty';
+        aplicarEstadoBoton();
+      }
+    }
+
+    aplicarEstadoBoton();
+    formEl.addEventListener('input', marcarDirty);
+    formEl.addEventListener('change', marcarDirty);
 
     if (selectedAnimalId) {
       renderHistorial(historialEl, selectedAnimalId, ctx.establecimientoActivoId, id ?? null);
@@ -276,7 +315,7 @@ export async function mountAtencionForm(contenedor, ctx, id) {
       });
     }
 
-    document.getElementById('atencion-form').addEventListener('submit', async (e) => {
+    formEl.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
       const errorEl = document.getElementById('atencion-error');
@@ -313,29 +352,26 @@ export async function mountAtencionForm(contenedor, ctx, id) {
       if (!campos.antecedentes.trim()) return showError('Los antecedentes son obligatorios.');
       if (!campos.diagnostico.trim()) return showError('El diagnóstico es obligatorio.');
 
-      const submitBtn = document.getElementById('atencion-submit');
-      const textoBotonNormal = esEdicion ? 'Guardar cambios' : 'Guardar atención';
-      const restaurarBoton = () => {
-        submitBtn.disabled = false;
-        submitBtn.textContent = textoBotonNormal;
-      };
-
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Guardando…';
+      estadoBoton = 'saving';
+      aplicarEstadoBoton();
 
       try {
         if (esEdicion) {
           await actualizarAtencion(id, campos);
+          estadoBoton = 'saved';
+          aplicarEstadoBoton();
           location.hash = '#atenciones';
         } else {
           await crearAtencion(campos);
+          estadoBoton = 'saved';
+          aplicarEstadoBoton();
           successEl.style.display = '';
           setTimeout(() => { location.hash = '#atenciones/nueva'; }, 2000);
         }
       } catch (err) {
         showError('Error al guardar: ' + err.message);
-      } finally {
-        restaurarBoton();
+        estadoBoton = 'dirty';
+        aplicarEstadoBoton();
       }
     });
   } catch (err) {
