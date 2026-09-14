@@ -314,6 +314,12 @@ export async function mountAtencionForm(contenedor, ctx, id) {
       if (!campos.diagnostico.trim()) return showError('El diagnóstico es obligatorio.');
 
       const submitBtn = document.getElementById('atencion-submit');
+      const textoBotonNormal = esEdicion ? 'Guardar cambios' : 'Guardar atención';
+      const restaurarBoton = () => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = textoBotonNormal;
+      };
+
       submitBtn.disabled = true;
       submitBtn.textContent = 'Guardando…';
 
@@ -328,8 +334,8 @@ export async function mountAtencionForm(contenedor, ctx, id) {
         }
       } catch (err) {
         showError('Error al guardar: ' + err.message);
-        submitBtn.disabled = false;
-        submitBtn.textContent = esEdicion ? 'Guardar cambios' : 'Guardar atención';
+      } finally {
+        restaurarBoton();
       }
     });
   } catch (err) {
