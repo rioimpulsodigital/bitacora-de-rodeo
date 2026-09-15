@@ -17,13 +17,15 @@ export async function mountAnimalesList(contenedor, ctx) {
     return;
   }
 
+  const puedeEditar = ctx.perfil?.rol !== 'OPERADOR_CAMPO';
+
   const filas = animales.map((a) => `
     <tr>
       <td>${escapeHtml(LABEL_ESPECIE[a.especie] ?? a.especie)}</td>
       <td>${escapeHtml(a.nombre ?? '—')}</td>
       <td>${escapeHtml(a.personas?.nombre ?? '—')}</td>
       <td class="rodeo-table-acciones">
-        <a href="#animales/editar/${a.id}">Editar</a>
+        ${puedeEditar ? `<a href="#animales/editar/${a.id}">Editar</a>` : ''}
       </td>
     </tr>`).join('');
 

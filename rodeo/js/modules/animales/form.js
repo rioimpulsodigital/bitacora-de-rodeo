@@ -18,6 +18,11 @@ const ESPECIES = [
 export async function mountAnimalForm(contenedor, ctx, id) {
   contenedor.innerHTML = '<p class="rodeo-loading">Cargando…</p>';
 
+  if (id && ctx.perfil?.rol === 'OPERADOR_CAMPO') {
+    contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">No tenés permiso para editar Pacientes existentes.</p></div>`;
+    return;
+  }
+
   let animal = null;
   let loteActivo = null;
 
