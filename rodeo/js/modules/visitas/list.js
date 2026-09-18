@@ -17,6 +17,7 @@ const LABEL_TIPO = {
   seguimiento: 'Seguimiento',
   emergencia: 'Emergencia',
   control: 'Control',
+  sanitaria: 'Sanitaria',
   otro: 'Otro',
 };
 

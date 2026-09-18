@@ -1,0 +1,116 @@
+-- BIT-42 — Visita Sanitaria por Lote o Categoría
+-- EJECUTAR CON CLAUDY en Supabase SQL Editor — Producción
+--
+-- CONTEXTO
+-- Se agrega el tipo de visita "sanitaria" y, para ese tipo, un alcance
+-- opcional de la intervención: todo un Lote o una Categoría dentro del
+-- Lote (ej.: "Vacas → Calcio + tacto reproductivo" y "Terneros → retiro
+-- de dispositivos nasales" en la misma jornada). No se crea Atención
+-- Clínica individual por animal para este caso de uso.
+--
+-- No existe ningún CREATE TABLE/policy de `visitas` versionado en este
+-- repo (se creó directamente en Supabase, igual que animales/personas/
+-- atenciones_clinicas antes de sus respectivas correcciones -- ver
+-- rodeo/js/modules/animales/migration-BIT-11-fix-animales-update-rls.sql).
+-- El Paso 1 (diagnóstico de solo lectura) es obligatorio antes de tocar
+-- nada, en particular para confirmar si existe un CHECK que hoy limite
+-- `tipo` a los 5 valores que ofrece el <select> del frontend
+-- (programada/seguimiento/emergencia/control/otro).
+--
+-- Este cambio NO modifica quién puede crear/editar Visitas: no se toca
+-- ninguna policy de RLS existente sobre `visitas`, solo se agregan
+-- columnas nuevas (todas nullable) y, si corresponde, se amplía el CHECK
+-- de `tipo` para incluir 'sanitaria'.
+--
+-- Decisión funcional de Brenda (BIT-42): la Categoría usa un catálogo
+-- sugerido en el frontend (Vaca/Vaquilla/Ternero/Ternera/Novillo/
+-- Novillito/Toro/Otro) pero SIN CHECK rígido en la base -- debe poder
+-- registrarse cualquier texto libre a futuro sin bloquear el guardado.
+-- Mismo criterio para `acciones_realizadas` (texto libre, sin catálogo
+-- de medicamentos/dosis/stock -- eso queda para una tarea futura).
+
+-- ── PASO 1 (OBLIGATORIO, SOLO LECTURA) ──────────────────────────────────────
+-- Documentar el resultado en BIT-42 (Notion) antes de aplicar nada.
+--
+--   -- Columnas actuales de visitas:
+--   SELECT column_name, data_type, is_nullable
+--   FROM information_schema.columns
+--   WHERE table_name = 'visitas'
+--   ORDER BY ordinal_position;
+--
+--   -- CHECK constraints actuales sobre visitas (para ver si `tipo` está
+--   -- limitado a los 5 valores del frontend):
+--   SELECT conname, pg_get_constraintdef(oid)
+--   FROM pg_constraint
+--   WHERE conrelid = 'visitas'::regclass AND contype = 'c';
+--
+--   -- Policies actuales de visitas (para confirmar que no dependen de
+--   -- ninguna columna que estemos por agregar):
+--   SELECT policyname, cmd, qual, with_check
+--   FROM pg_policies WHERE tablename = 'visitas';
+--
+--   -- RLS habilitado/forzado:
+--   SELECT relname, relrowsecurity, relforcerowsecurity
+--   FROM pg_class WHERE relname = 'visitas';
+--
+-- Si el Paso 1 muestra que `visitas` tiene columnas o constraints que
+-- contradicen lo asumido acá (por ejemplo, una FK o CHECK que este script
+-- no contempla), DETENERSE y reportar antes de continuar.
+
+-- ── PASO 2a — COLUMNAS NUEVAS (idempotente) ─────────────────────────────────
+-- Todas nullable: una Visita no-Sanitaria nunca las completa.
+
+ALTER TABLE visitas ADD COLUMN IF NOT EXISTS lote_id              uuid REFERENCES lotes(id);
+ALTER TABLE visitas ADD COLUMN IF NOT EXISTS alcance              text;
+ALTER TABLE visitas ADD COLUMN IF NOT EXISTS categoria            text;
+ALTER TABLE visitas ADD COLUMN IF NOT EXISTS acciones_realizadas  text;
+
+-- Sin CHECK sobre `alcance` ni `categoria` -- decisión explícita (ver
+-- CONTEXTO arriba). El frontend valida que, si `alcance = 'categoria'`,
+-- venga una `categoria` no vacía.
+
+-- ── PASO 2b — CHECK de `tipo` (SOLO SI el Paso 1 encontró uno) ─────────────
+-- Si el Paso 1 NO encontró ningún CHECK sobre `tipo`: no hacer nada acá,
+-- el frontend ya es la única validación (igual que hoy).
+--
+-- Si el Paso 1 SÍ encontró un CHECK (ej. algo como
+-- "tipo = ANY (ARRAY['programada','seguimiento','emergencia','control','otro'])"),
+-- reemplazar <NOMBRE_CONSTRAINT> por el `conname` real que devolvió el
+-- Paso 1 y ejecutar:
+--
+-- ALTER TABLE visitas DROP CONSTRAINT <NOMBRE_CONSTRAINT>;
+-- ALTER TABLE visitas ADD CONSTRAINT <NOMBRE_CONSTRAINT>
+--   CHECK (tipo IN ('programada','seguimiento','emergencia','control','sanitaria','otro'));
+
+-- ── PASO 3 (OBLIGATORIO) — VALIDAR EN TRANSACCIÓN ANTES DE COMMITEAR ────────
+-- Ejecutar como un usuario real con rol PROFESIONAL (el rol que hoy crea
+-- Visitas), no como service role.
+--
+-- BEGIN;
+--
+--   -- Caso 1 -- Visita Sanitaria con alcance "todo el lote" → DEBE PASAR:
+--   INSERT INTO visitas (establecimiento_id, fecha, tipo, estado, lote_id, alcance, acciones_realizadas)
+--   VALUES ('<establecimiento_autorizado_id>', CURRENT_DATE, 'sanitaria', 'abierta',
+--           '<lote_id_existente>', 'todo_lote', 'Ivermectina 3.15 + Pour On (prueba BIT-42)');
+--
+--   -- Caso 2 -- Visita Sanitaria con alcance "categoría" → DEBE PASAR:
+--   INSERT INTO visitas (establecimiento_id, fecha, tipo, estado, lote_id, alcance, categoria, acciones_realizadas)
+--   VALUES ('<establecimiento_autorizado_id>', CURRENT_DATE, 'sanitaria', 'abierta',
+--           '<lote_id_existente>', 'categoria', 'Vaca', 'Calcio + tacto reproductivo (prueba BIT-42)');
+--
+--   -- Caso 3 -- Visita de un tipo ya existente (ej. 'control'), sin ninguno
+--   -- de los campos nuevos → DEBE seguir funcionando igual que hoy:
+--   INSERT INTO visitas (establecimiento_id, fecha, tipo, estado)
+--   VALUES ('<establecimiento_autorizado_id>', CURRENT_DATE, 'control', 'abierta');
+--
+-- ROLLBACK; -- no dejar registros de prueba en Producción
+
+-- ── VERIFICACIÓN POST-APLICACIÓN (SOLO LECTURA) ─────────────────────────────
+--   SELECT column_name, data_type, is_nullable
+--   FROM information_schema.columns
+--   WHERE table_name = 'visitas'
+--   ORDER BY ordinal_position;
+--
+--   SELECT conname, pg_get_constraintdef(oid)
+--   FROM pg_constraint
+--   WHERE conrelid = 'visitas'::regclass AND contype = 'c';
