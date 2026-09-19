@@ -31,8 +31,6 @@ export async function mountVisitaForm(contenedor, ctx, id) {
   }
 
   const activoId = ctx.establecimientoActivoId;
-  const establecimientos = ctx.establecimientos;
-  const seleccionadoId = visita?.establecimiento_id ?? activoId;
 
   let lotes = [];
   try {
@@ -41,10 +39,6 @@ export async function mountVisitaForm(contenedor, ctx, id) {
     contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">Error al cargar lotes: ${escapeHtml(e.message)}</p></div>`;
     return;
   }
-
-  const establecimientosOpts = establecimientos.map(
-    (e) => `<option value="${e.id}" ${seleccionadoId === e.id ? 'selected' : ''}>${escapeHtml(e.nombre)}</option>`
-  ).join('');
 
   const hoy = new Date().toISOString().split('T')[0];
 
@@ -82,11 +76,6 @@ export async function mountVisitaForm(contenedor, ctx, id) {
         <label class="form-label">Tipo de visita <span class="rodeo-required">*</span></label>
         <select class="form-field" name="tipo" required>
           ${tipoOpts}
-        </select>
-
-        <label class="form-label">Establecimiento <span class="rodeo-required">*</span></label>
-        <select class="form-field" name="establecimiento_id" required>
-          ${establecimientosOpts}
         </select>
 
         <label class="form-label">Hora de inicio (opcional)</label>
@@ -180,7 +169,7 @@ export async function mountVisitaForm(contenedor, ctx, id) {
     const campos = {
       fecha: fd.get('fecha'),
       tipo: fd.get('tipo'),
-      establecimiento_id: fd.get('establecimiento_id'),
+      establecimiento_id: visita?.establecimiento_id ?? activoId,
       hora_inicio: fd.get('hora_inicio'),
       hora_fin: fd.get('hora_fin'),
       estado: fd.get('estado') ?? 'abierta',
