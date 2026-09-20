@@ -53,9 +53,24 @@ export async function listLotesParaSelector(establecimientoId) {
 }
 
 export async function listVisitasParaSelector(establecimientoId) {
-  let q = supabase.from('visitas').select('id, fecha, tipo');
+  let q = supabase.from('visitas').select('id, fecha, tipo, lote_id');
   if (establecimientoId) q = q.eq('establecimiento_id', establecimientoId);
   const { data, error } = await q.order('fecha', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+// Lote activo del Paciente (misma regla que animales/services.js:
+// como máximo una membresía activa, fecha_fin IS NULL). Es la única
+// relación real que existe entre una Visita y un Paciente: `visitas` no
+// tiene animal_id -- solo un lote_id opcional (BIT-42, Visita Sanitaria).
+export async function getLoteActivoAnimal(animalId) {
+  const { data, error } = await supabase
+    .from('lotes_animales')
+    .select('lote_id')
+    .eq('animal_id', animalId)
+    .is('fecha_fin', null)
+    .maybeSingle();
   if (error) throw error;
   return data;
 }

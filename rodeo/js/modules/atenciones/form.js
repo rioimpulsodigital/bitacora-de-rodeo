@@ -4,10 +4,32 @@ import {
   listLotesParaSelector,
   listVisitasParaSelector,
   listHistorialAnimal,
+  getLoteActivoAnimal,
   crearAtencion,
   actualizarAtencion,
 } from './services.js';
 import { escapeHtml } from '../../dashboard.js';
+
+// Una Visita es compatible con un Paciente si es una visita general (sin
+// lote_id, la mayoría de los tipos) o si su lote_id coincide con el lote
+// activo actual del Paciente. No existe animal_id en `visitas` -- esta es
+// la única relación real disponible (ver getLoteActivoAnimal).
+// `forceIncludeSelected` evita reasignar/borrar silenciosamente la Visita
+// ya guardada al editar, aunque su lote ya no coincida con el del Paciente.
+function construirVisitaOpts(visitas, animalLoteId, selectedVisitaId, forceIncludeSelected) {
+  let compatibles = visitas.filter((v) => v.lote_id == null || v.lote_id === animalLoteId);
+  if (forceIncludeSelected && selectedVisitaId && !compatibles.some((v) => v.id === selectedVisitaId)) {
+    const yaGuardada = visitas.find((v) => v.id === selectedVisitaId);
+    if (yaGuardada) compatibles = [...compatibles, yaGuardada];
+  }
+  return [
+    '<option value="">— Sin visita —</option>',
+    ...compatibles.map((v) => {
+      const [y, m, d] = v.fecha.split('-');
+      return `<option value="${v.id}" ${selectedVisitaId === v.id ? 'selected' : ''}>${d}/${m}/${y} — ${escapeHtml(v.tipo ?? '')}</option>`;
+    }),
+  ].join('');
+}
 
 function tieneRol(perfil, rol) {
   return perfil.rol === rol;
@@ -112,6 +134,10 @@ export async function mountAtencionForm(contenedor, ctx, id) {
     if (returnedAnimalId) sessionStorage.removeItem('_atenciones_animal_id');
     const selectedAnimalId = returnedAnimalId ?? atencion?.animal_id ?? '';
 
+    const loteActivoInicial = selectedAnimalId
+      ? (await getLoteActivoAnimal(selectedAnimalId))?.lote_id ?? null
+      : null;
+
     const { hoy, hora: horaActual } = getNow();
 
     const animalesOpts = [
@@ -129,13 +155,7 @@ export async function mountAtencionForm(contenedor, ctx, id) {
       ),
     ].join('');
 
-    const visitasOpts = [
-      '<option value="">— Sin visita —</option>',
-      ...visitas.map((v) => {
-        const [y, m, d] = v.fecha.split('-');
-        return `<option value="${v.id}" ${atencion?.visita_id === v.id ? 'selected' : ''}>${d}/${m}/${y} — ${escapeHtml(v.tipo ?? '')}</option>`;
-      }),
-    ].join('');
+    const visitasOpts = construirVisitaOpts(visitas, loteActivoInicial, atencion?.visita_id ?? '', esEdicion);
 
     // Profesional responsable:
     // - Creación (solo PROFESIONAL): auto-completado con el usuario autenticado, no editable.
@@ -193,7 +213,7 @@ export async function mountAtencionForm(contenedor, ctx, id) {
           </select>
 
           <label class="form-label">Visita de terreno relacionada (opcional)</label>
-          <select class="form-field" name="visita_id">
+          <select class="form-field" name="visita_id" id="atencion-visita">
             ${visitasOpts}
           </select>
 
@@ -253,6 +273,7 @@ export async function mountAtencionForm(contenedor, ctx, id) {
 
     const historialEl = document.getElementById('atencion-historial');
     const animalSelect = document.getElementById('atencion-animal');
+    const visitaSelect = document.getElementById('atencion-visita');
     const formEl = document.getElementById('atencion-form');
     const submitBtn = document.getElementById('atencion-submit');
     const textoBotonNormal = esEdicion ? 'Guardar cambios' : 'Guardar atención';
@@ -297,13 +318,13 @@ export async function mountAtencionForm(contenedor, ctx, id) {
       renderHistorial(historialEl, selectedAnimalId, ctx.establecimientoActivoId, id ?? null);
     }
 
-    animalSelect.addEventListener('change', () => {
-      renderHistorial(
-        historialEl,
-        animalSelect.value || null,
-        ctx.establecimientoActivoId,
-        id ?? null
-      );
+    animalSelect.addEventListener('change', async () => {
+      const nuevoAnimalId = animalSelect.value || null;
+      renderHistorial(historialEl, nuevoAnimalId, ctx.establecimientoActivoId, id ?? null);
+      const nuevoLoteActivo = nuevoAnimalId
+        ? (await getLoteActivoAnimal(nuevoAnimalId))?.lote_id ?? null
+        : null;
+      visitaSelect.innerHTML = construirVisitaOpts(visitas, nuevoLoteActivo, '', false);
     });
 
     const btnNuevo = document.getElementById('btn-nuevo-paciente');
