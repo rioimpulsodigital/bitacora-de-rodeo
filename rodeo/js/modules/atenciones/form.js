@@ -16,24 +16,39 @@ import { escapeHtml } from '../../dashboard.js';
 // la única relación real disponible (ver getLoteActivoAnimal).
 // `forceIncludeSelected` evita reasignar/borrar silenciosamente la Visita
 // ya guardada al editar, aunque su lote ya no coincida con el del Paciente.
-// Integridad: si el Paciente tiene lote activo, el selector solo debe
-// ofrecer "Sin lote" + ese lote -- no otros lotes del establecimiento, para
-// no poder asociar por error al Paciente con un lote al que no pertenece.
-// Si el Paciente no tiene lote activo, se ofrecen todos (comportamiento
-// preexistente, sin cambios). `forceIncludeSelected` preserva el lote_id
-// histórico de una Atención ya guardada al editar, aunque ya no sea el
-// lote activo actual del Paciente -- mismo patrón que construirVisitaOpts.
+// Crear Atención / cambiar de Paciente (forceIncludeSelected=false): si el
+// Paciente tiene lote activo, ese es el ÚNICO valor posible -- ni "Sin
+// lote" ni otros lotes, para que no se pueda desvincular accidentalmente
+// la Atención del lote activo conocido del Paciente. Sin lote activo: se
+// mantiene el comportamiento vigente (todos los lotes + "Sin lote").
+//
+// Editar Atención existente (forceIncludeSelected=true): se preserva tal
+// cual el valor histórico guardado -- incluida la ausencia de lote -- sin
+// restringir ni sustituirlo automáticamente por el lote activo actual del
+// Paciente, aunque ya no coincidan.
 function construirLoteOpts(lotes, animalLoteId, selectedLoteId, forceIncludeSelected) {
-  let disponibles = animalLoteId ? lotes.filter((l) => l.id === animalLoteId) : lotes;
-  if (forceIncludeSelected && selectedLoteId && !disponibles.some((l) => l.id === selectedLoteId)) {
-    const yaGuardado = lotes.find((l) => l.id === selectedLoteId);
-    if (yaGuardado) disponibles = [...disponibles, yaGuardado];
+  if (forceIncludeSelected) {
+    let disponibles = animalLoteId ? lotes.filter((l) => l.id === animalLoteId) : lotes;
+    if (selectedLoteId && !disponibles.some((l) => l.id === selectedLoteId)) {
+      const yaGuardado = lotes.find((l) => l.id === selectedLoteId);
+      if (yaGuardado) disponibles = [...disponibles, yaGuardado];
+    }
+    return [
+      '<option value="">— Sin lote —</option>',
+      ...disponibles.map(
+        (l) => `<option value="${l.id}" ${selectedLoteId === l.id ? 'selected' : ''}>${escapeHtml(l.nombre)}</option>`
+      ),
+    ].join('');
   }
+
+  if (animalLoteId) {
+    const lote = lotes.find((l) => l.id === animalLoteId);
+    if (lote) return `<option value="${lote.id}" selected>${escapeHtml(lote.nombre)}</option>`;
+  }
+
   return [
     '<option value="">— Sin lote —</option>',
-    ...disponibles.map(
-      (l) => `<option value="${l.id}" ${selectedLoteId === l.id ? 'selected' : ''}>${escapeHtml(l.nombre)}</option>`
-    ),
+    ...lotes.map((l) => `<option value="${l.id}">${escapeHtml(l.nombre)}</option>`),
   ].join('');
 }
 
@@ -345,10 +360,11 @@ export async function mountAtencionForm(contenedor, ctx, id) {
         ? (await getLoteActivoAnimal(nuevoAnimalId))?.lote_id ?? null
         : null;
       // Recalcular el lote propuesto según el nuevo Paciente -- no se
-      // conserva el lote del Paciente anterior (sigue siendo editable).
-      // selectedLoteId = nuevoLoteActivo (no '') para que el lote activo
-      // quede efectivamente preseleccionado, no solo disponible.
-      lotesSelect.innerHTML = construirLoteOpts(lotes, nuevoLoteActivo, nuevoLoteActivo ?? '', false);
+      // conserva el lote del Paciente anterior (sigue siendo editable si
+      // el Paciente no tiene lote activo). selectedLoteId no aplica acá:
+      // con forceIncludeSelected=false, si hay lote activo queda forzado
+      // como único valor dentro de construirLoteOpts.
+      lotesSelect.innerHTML = construirLoteOpts(lotes, nuevoLoteActivo, '', false);
       visitaSelect.innerHTML = construirVisitaOpts(visitas, nuevoLoteActivo, '', false);
     });
 
