@@ -16,6 +16,19 @@ import { escapeHtml } from '../../dashboard.js';
 // la única relación real disponible (ver getLoteActivoAnimal).
 // `forceIncludeSelected` evita reasignar/borrar silenciosamente la Visita
 // ya guardada al editar, aunque su lote ya no coincida con el del Paciente.
+// Lote propuesto: al crear, se sugiere el lote activo del Paciente (si
+// tiene); al editar, se preserva el lote_id ya guardado en la Atención sin
+// reemplazarlo automáticamente. Sigue siendo opcional y editable en ambos
+// casos -- esto solo decide qué queda preseleccionado al montar/recalcular.
+function construirLoteOpts(lotes, selectedLoteId) {
+  return [
+    '<option value="">— Sin lote —</option>',
+    ...lotes.map(
+      (l) => `<option value="${l.id}" ${selectedLoteId === l.id ? 'selected' : ''}>${escapeHtml(l.nombre)}</option>`
+    ),
+  ].join('');
+}
+
 function construirVisitaOpts(visitas, animalLoteId, selectedVisitaId, forceIncludeSelected) {
   let compatibles = visitas.filter((v) => v.lote_id == null || v.lote_id === animalLoteId);
   if (forceIncludeSelected && selectedVisitaId && !compatibles.some((v) => v.id === selectedVisitaId)) {
@@ -148,12 +161,10 @@ export async function mountAtencionForm(contenedor, ctx, id) {
       }),
     ].join('');
 
-    const lotesOpts = [
-      '<option value="">— Sin lote —</option>',
-      ...lotes.map(
-        (l) => `<option value="${l.id}" ${atencion?.lote_id === l.id ? 'selected' : ''}>${escapeHtml(l.nombre)}</option>`
-      ),
-    ].join('');
+    // Crear: se sugiere el lote activo del Paciente. Editar: se preserva
+    // el lote_id ya guardado en la Atención, sin auto-reemplazarlo.
+    const loteInicialSeleccionado = esEdicion ? (atencion?.lote_id ?? '') : (loteActivoInicial ?? '');
+    const lotesOpts = construirLoteOpts(lotes, loteInicialSeleccionado);
 
     const visitasOpts = construirVisitaOpts(visitas, loteActivoInicial, atencion?.visita_id ?? '', esEdicion);
 
@@ -208,7 +219,7 @@ export async function mountAtencionForm(contenedor, ctx, id) {
           </div>
 
           <label class="form-label">Lote (opcional)</label>
-          <select class="form-field" name="lote_id">
+          <select class="form-field" name="lote_id" id="atencion-lote">
             ${lotesOpts}
           </select>
 
@@ -273,6 +284,7 @@ export async function mountAtencionForm(contenedor, ctx, id) {
 
     const historialEl = document.getElementById('atencion-historial');
     const animalSelect = document.getElementById('atencion-animal');
+    const lotesSelect = document.getElementById('atencion-lote');
     const visitaSelect = document.getElementById('atencion-visita');
     const formEl = document.getElementById('atencion-form');
     const submitBtn = document.getElementById('atencion-submit');
@@ -324,6 +336,9 @@ export async function mountAtencionForm(contenedor, ctx, id) {
       const nuevoLoteActivo = nuevoAnimalId
         ? (await getLoteActivoAnimal(nuevoAnimalId))?.lote_id ?? null
         : null;
+      // Recalcular el lote propuesto según el nuevo Paciente -- no se
+      // conserva el lote del Paciente anterior (sigue siendo editable).
+      lotesSelect.innerHTML = construirLoteOpts(lotes, nuevoLoteActivo ?? '');
       visitaSelect.innerHTML = construirVisitaOpts(visitas, nuevoLoteActivo, '', false);
     });
 
