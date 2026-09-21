@@ -346,7 +346,9 @@ export async function mountAtencionForm(contenedor, ctx, id) {
         : null;
       // Recalcular el lote propuesto según el nuevo Paciente -- no se
       // conserva el lote del Paciente anterior (sigue siendo editable).
-      lotesSelect.innerHTML = construirLoteOpts(lotes, nuevoLoteActivo, '', false);
+      // selectedLoteId = nuevoLoteActivo (no '') para que el lote activo
+      // quede efectivamente preseleccionado, no solo disponible.
+      lotesSelect.innerHTML = construirLoteOpts(lotes, nuevoLoteActivo, nuevoLoteActivo ?? '', false);
       visitaSelect.innerHTML = construirVisitaOpts(visitas, nuevoLoteActivo, '', false);
     });
 
