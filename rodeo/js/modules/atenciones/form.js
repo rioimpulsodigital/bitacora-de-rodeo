@@ -16,14 +16,22 @@ import { escapeHtml } from '../../dashboard.js';
 // la única relación real disponible (ver getLoteActivoAnimal).
 // `forceIncludeSelected` evita reasignar/borrar silenciosamente la Visita
 // ya guardada al editar, aunque su lote ya no coincida con el del Paciente.
-// Lote propuesto: al crear, se sugiere el lote activo del Paciente (si
-// tiene); al editar, se preserva el lote_id ya guardado en la Atención sin
-// reemplazarlo automáticamente. Sigue siendo opcional y editable en ambos
-// casos -- esto solo decide qué queda preseleccionado al montar/recalcular.
-function construirLoteOpts(lotes, selectedLoteId) {
+// Integridad: si el Paciente tiene lote activo, el selector solo debe
+// ofrecer "Sin lote" + ese lote -- no otros lotes del establecimiento, para
+// no poder asociar por error al Paciente con un lote al que no pertenece.
+// Si el Paciente no tiene lote activo, se ofrecen todos (comportamiento
+// preexistente, sin cambios). `forceIncludeSelected` preserva el lote_id
+// histórico de una Atención ya guardada al editar, aunque ya no sea el
+// lote activo actual del Paciente -- mismo patrón que construirVisitaOpts.
+function construirLoteOpts(lotes, animalLoteId, selectedLoteId, forceIncludeSelected) {
+  let disponibles = animalLoteId ? lotes.filter((l) => l.id === animalLoteId) : lotes;
+  if (forceIncludeSelected && selectedLoteId && !disponibles.some((l) => l.id === selectedLoteId)) {
+    const yaGuardado = lotes.find((l) => l.id === selectedLoteId);
+    if (yaGuardado) disponibles = [...disponibles, yaGuardado];
+  }
   return [
     '<option value="">— Sin lote —</option>',
-    ...lotes.map(
+    ...disponibles.map(
       (l) => `<option value="${l.id}" ${selectedLoteId === l.id ? 'selected' : ''}>${escapeHtml(l.nombre)}</option>`
     ),
   ].join('');
@@ -164,7 +172,7 @@ export async function mountAtencionForm(contenedor, ctx, id) {
     // Crear: se sugiere el lote activo del Paciente. Editar: se preserva
     // el lote_id ya guardado en la Atención, sin auto-reemplazarlo.
     const loteInicialSeleccionado = esEdicion ? (atencion?.lote_id ?? '') : (loteActivoInicial ?? '');
-    const lotesOpts = construirLoteOpts(lotes, loteInicialSeleccionado);
+    const lotesOpts = construirLoteOpts(lotes, loteActivoInicial, loteInicialSeleccionado, esEdicion);
 
     const visitasOpts = construirVisitaOpts(visitas, loteActivoInicial, atencion?.visita_id ?? '', esEdicion);
 
@@ -338,7 +346,7 @@ export async function mountAtencionForm(contenedor, ctx, id) {
         : null;
       // Recalcular el lote propuesto según el nuevo Paciente -- no se
       // conserva el lote del Paciente anterior (sigue siendo editable).
-      lotesSelect.innerHTML = construirLoteOpts(lotes, nuevoLoteActivo ?? '');
+      lotesSelect.innerHTML = construirLoteOpts(lotes, nuevoLoteActivo, '', false);
       visitaSelect.innerHTML = construirVisitaOpts(visitas, nuevoLoteActivo, '', false);
     });
 
