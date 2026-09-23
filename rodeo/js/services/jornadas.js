@@ -54,7 +54,9 @@ export async function actualizarJornada(id, campos) {
   if (error) throw error;
 }
 
-export async function eliminarJornada(id) {
-  const { error } = await supabase.from('jornadas').delete().eq('id', id);
-  if (error) throw error;
-}
+// eliminarJornada() se retiró a propósito (BIT-45, mitigación urgente):
+// hacía un DELETE físico real, sin papelera ni traza. La solución
+// definitiva (soft-delete + Papelera) llega con BIT-35. La policy RLS
+// jornadas_delete (is_admin() OR profesional_id = auth.uid()) sigue
+// activa en Producción -- esto solo retira la vía de la app, no cierra
+// la capacidad a nivel de base de datos.

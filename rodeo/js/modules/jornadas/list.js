@@ -1,4 +1,4 @@
-import { listJornadas, eliminarJornada } from '../../services/jornadas.js';
+import { listJornadas } from '../../services/jornadas.js';
 import { escapeHtml } from '../../dashboard.js';
 
 function fmtHora(t) {
@@ -19,7 +19,6 @@ export async function mountJornadasList(contenedor, ctx) {
   const filas = jornadas
     .map((j) => {
       const esPropia = j.profesional_id === ctx.perfil.id;
-      const puedeEliminar = esPropia || ctx.perfil.rol === 'ADMINISTRADOR';
       return `
         <tr>
           <td>${escapeHtml(j.fecha)}</td>
@@ -28,7 +27,6 @@ export async function mountJornadasList(contenedor, ctx) {
           <td>${escapeHtml(j.perfiles?.nombre ?? '—')}</td>
           <td class="rodeo-table-acciones">
             <a href="#jornadas/editar/${j.id}">${esPropia ? 'Editar' : 'Ver'}</a>
-            ${puedeEliminar ? `<button type="button" class="rodeo-link-btn rodeo-jornada-eliminar" data-id="${j.id}">Eliminar</button>` : ''}
           </td>
         </tr>`;
     })
@@ -50,16 +48,4 @@ export async function mountJornadasList(contenedor, ctx) {
       }
     </div>
   `;
-
-  contenedor.querySelectorAll('.rodeo-jornada-eliminar').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      if (!confirm('¿Eliminar esta jornada?')) return;
-      try {
-        await eliminarJornada(btn.dataset.id);
-        mountJornadasList(contenedor, ctx);
-      } catch (e) {
-        alert('Error al eliminar: ' + e.message);
-      }
-    });
-  });
 }
