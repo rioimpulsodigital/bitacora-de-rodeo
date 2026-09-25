@@ -123,6 +123,9 @@ export async function mountNovedadForm(contenedor, ctx, id) {
           <button type="submit" class="rodeo-btn rodeo-btn-primary">
             ${esEdicion ? 'Guardar cambios' : 'Crear novedad'}
           </button>
+          ${esEdicion && esAdmin
+            ? '<button type="button" id="btn-eliminar" class="rodeo-link-btn">Enviar a la Papelera</button>'
+            : ''}
         </div>
       </form>
       </div>`;
@@ -133,13 +136,14 @@ export async function mountNovedadForm(contenedor, ctx, id) {
         e.target.value === 'clima' ? '' : 'none';
     });
 
-    // Soft delete (solo ADMINISTRADOR)
+    // Enviar a la Papelera (solo ADMINISTRADOR; soft-delete server-side vía
+    // soft_delete_novedad(), sin DELETE físico). Reversible desde la Papelera.
     const btnEliminar = document.getElementById('btn-eliminar');
     if (btnEliminar) {
       btnEliminar.addEventListener('click', async () => {
         if (
           !confirm(
-            '¿Eliminar esta novedad? Quedará marcada como eliminada y no se podrá ver desde la app.'
+            '¿Enviar esta novedad a la Papelera?\n\nDejará de verse en el listado, pero podrás restaurarla desde la Papelera.'
           )
         )
           return;
@@ -148,6 +152,7 @@ export async function mountNovedadForm(contenedor, ctx, id) {
         errEl.style.display = 'none';
         try {
           await eliminarNovedad(id);
+          sessionStorage.setItem('_novedades_msg', 'Novedad enviada a la Papelera.');
           location.hash = '#novedades';
         } catch (err) {
           errEl.textContent = 'Error al eliminar: ' + err.message;

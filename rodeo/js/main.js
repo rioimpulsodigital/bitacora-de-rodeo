@@ -17,6 +17,7 @@ import { registrarRutasVisitas } from './modules/visitas/index.js';
 import { registrarRutasObservaciones } from './modules/observaciones/index.js';
 import { registrarRutasNovedades } from './modules/novedades/index.js';
 import { registrarRutasAtenciones } from './modules/atenciones/index.js';
+import { registrarRutasPapelera } from './modules/papelera/index.js';
 
 async function handleSignOut() {
   await signOut();
@@ -68,6 +69,12 @@ async function iniciar() {
   registrarRutasObservaciones(contenedor, ctx);
   registrarRutasNovedades(contenedor, ctx);
   registrarRutasAtenciones(contenedor, ctx);
+  registrarRutasPapelera(contenedor, ctx);
+
+  // Papelera: solo ADMINISTRADOR ve la entrada (la restricción real es server-side).
+  if (perfil.rol === 'ADMINISTRADOR') {
+    document.getElementById('rodeo-nav-papelera').style.display = '';
+  }
 
   iniciarRouter('dashboard');
 }

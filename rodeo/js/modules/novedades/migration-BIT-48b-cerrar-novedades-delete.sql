@@ -1,0 +1,56 @@
+-- BIT-48b — Cerrar el DELETE directo sobre novedades_establecimiento
+-- EJECUTAR CON CLAUDY en Supabase SQL Editor — Producción
+-- ESTADO: PREPARADA, NO APLICADA. Se autoriza POR SEPARADO de
+-- migration-BIT-48-papelera-novedades.sql (mismo criterio que BIT-47).
+-- Aplicar solo DESPUÉS de que BIT-48 (funciones) esté aplicada y validada.
+--
+-- ─── POR QUÉ ─────────────────────────────────────────────────────────────
+-- BIT-46 confirmó que novedades_establecimiento tiene una policy DELETE
+-- restringida a ADMINISTRADOR (se asume el nombre novedades_delete, ver
+-- ANTHY.md / BIT-10; CONFIRMAR con diagnostico-BIT-48-novedades.sql §2).
+-- Con esa policy, un ADMINISTRADOR puede emitir un DELETE directo contra la
+-- API (PostgREST) sobre CUALQUIER novedad, incluso una activa -- saltándose
+-- la regla aprobada en BIT-35 "eliminación definitiva solo desde Papelera".
+-- Es el mismo patrón que BIT-47 cerró en `animales` y que BIT-45 mitigó en
+-- Jornadas. hard_delete_novedad() (SECURITY DEFINER) no depende de esa policy
+-- para funcionar, así que retirarla no afecta el flujo nuevo.
+--
+-- ─── ALCANCE ESTRICTO ────────────────────────────────────────────────────
+-- Solo: DROP POLICY IF EXISTS novedades_delete ON public.novedades_establecimiento;
+-- NO toca SELECT/INSERT/UPDATE, NO toca novedades_adjuntos, NO toca grants,
+-- NO crea policies.
+--
+-- ─── RESIDUAL DOCUMENTADO (no se modifica acá) ───────────────────────────
+-- La policy UPDATE actual permite a ADMINISTRADOR modificar deleted_at
+-- directamente (incluido reactivar). Es un vector solo-ADMINISTRADOR, sin
+-- pérdida de datos (reversible), y cambiarlo excede este piloto.
+
+-- ── PASO 1 (OBLIGATORIO, SOLO LECTURA) ─────────────────────────────────────
+--   SELECT policyname, cmd, roles, qual, with_check
+--   FROM pg_policies
+--   WHERE schemaname = 'public' AND tablename = 'novedades_establecimiento' AND cmd = 'DELETE';
+--   -- Debe haber exactamente UNA policy DELETE y llamarse novedades_delete.
+--   -- GUARDAR su qual/with_check textual: es el insumo del ROLLBACK de abajo.
+--   -- Si el nombre o la cantidad difieren: DETENERSE y reportar.
+
+-- ── PASO 2 — CAMBIO ────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS novedades_delete ON public.novedades_establecimiento;
+
+-- ── VERIFICACIÓN POST-APLICACIÓN (SOLO LECTURA) ────────────────────────────
+--   SELECT policyname, cmd FROM pg_policies
+--   WHERE schemaname = 'public' AND tablename = 'novedades_establecimiento'
+--   ORDER BY cmd, policyname;
+--   -- No debe existir ninguna policy con cmd = 'DELETE'.
+--   -- Las policies SELECT / INSERT / UPDATE deben permanecer sin cambios.
+--   SELECT relrowsecurity FROM pg_class WHERE relname = 'novedades_establecimiento';
+--   -- Debe seguir en true.
+--   -- NO ejecutar un DELETE de prueba. La validación es estructural.
+
+-- ── ROLLBACK (solo recuperación; requiere autorización) ────────────────────
+-- Recrear la policy con la expresión TEXTUAL capturada en el Paso 1. Plantilla
+-- (reemplazar <EXPRESION_REAL_DEL_PASO_1>; la de abajo es solo la hipótesis
+-- "restringida a ADMINISTRADOR" de BIT-46, NO confirmada textualmente):
+--   CREATE POLICY novedades_delete ON public.novedades_establecimiento
+--     FOR DELETE TO public
+--     USING (<EXPRESION_REAL_DEL_PASO_1>);
+-- Hipótesis a contrastar: USING (is_admin() AND tiene_acceso_establecimiento(establecimiento_id))
