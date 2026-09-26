@@ -54,12 +54,17 @@ export async function mountNovedadesList(contenedor, ctx) {
       </div>`;
     }
 
+    const mensaje = sessionStorage.getItem('_novedades_msg');
+    if (mensaje) sessionStorage.removeItem('_novedades_msg');
+    const mensajeHtml = mensaje ? `<div class="rodeo-msg-ok">${mensaje}</div>` : '';
+
     contenedor.innerHTML = `
       <div class="rodeo-card">
         <div class="rodeo-view-header">
           <h2>📰 Novedades del Establecimiento</h2>
           <a href="#novedades/nueva" class="rodeo-btn rodeo-btn-primary">+ Nueva Novedad</a>
         </div>
+        ${mensajeHtml}
         ${cuerpo}
       </div>`;
   } catch (err) {
