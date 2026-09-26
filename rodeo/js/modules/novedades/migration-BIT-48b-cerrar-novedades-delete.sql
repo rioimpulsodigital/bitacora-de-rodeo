@@ -5,9 +5,11 @@
 -- Aplicar solo DESPUÉS de que BIT-48 (funciones) esté aplicada y validada.
 --
 -- ─── POR QUÉ ─────────────────────────────────────────────────────────────
--- BIT-46 confirmó que novedades_establecimiento tiene una policy DELETE
--- restringida a ADMINISTRADOR (se asume el nombre novedades_delete, ver
--- ANTHY.md / BIT-10; CONFIRMAR con diagnostico-BIT-48-novedades.sql §2).
+-- CONFIRMADO contra Producción real (Claudy, 25 sep 2026, ver complementación
+-- en el informe BIT-48 §2-3): existe exactamente una policy DELETE sobre
+-- novedades_establecimiento, se llama novedades_delete, PERMISSIVE, roles
+-- {authenticated}, with_check NULL. USING textual exacto:
+--   tiene_acceso_establecimiento(establecimiento_id) AND (get_mi_rol() = 'ADMINISTRADOR')
 -- Con esa policy, un ADMINISTRADOR puede emitir un DELETE directo contra la
 -- API (PostgREST) sobre CUALQUIER novedad, incluso una activa -- saltándose
 -- la regla aprobada en BIT-35 "eliminación definitiva solo desde Papelera".
@@ -26,12 +28,16 @@
 -- pérdida de datos (reversible), y cambiarlo excede este piloto.
 
 -- ── PASO 1 (OBLIGATORIO, SOLO LECTURA) ─────────────────────────────────────
---   SELECT policyname, cmd, roles, qual, with_check
+--   SELECT policyname, permissive, roles, cmd, qual, with_check
 --   FROM pg_policies
 --   WHERE schemaname = 'public' AND tablename = 'novedades_establecimiento' AND cmd = 'DELETE';
 --   -- Debe haber exactamente UNA policy DELETE y llamarse novedades_delete.
 --   -- GUARDAR su qual/with_check textual: es el insumo del ROLLBACK de abajo.
 --   -- Si el nombre o la cantidad difieren: DETENERSE y reportar.
+--   -- Ya ejecutado y confirmado (Claudy, 25 sep 2026): ver el resultado real
+--   -- reflejado en el bloque ROLLBACK de abajo. Re-ejecutar este SELECT de
+--   -- todos modos inmediatamente antes de aplicar el PASO 2, para descartar
+--   -- cualquier cambio entre la auditoría y la aplicación.
 
 -- ── PASO 2 — CAMBIO ────────────────────────────────────────────────────────
 DROP POLICY IF EXISTS novedades_delete ON public.novedades_establecimiento;
@@ -47,10 +53,10 @@ DROP POLICY IF EXISTS novedades_delete ON public.novedades_establecimiento;
 --   -- NO ejecutar un DELETE de prueba. La validación es estructural.
 
 -- ── ROLLBACK (solo recuperación; requiere autorización) ────────────────────
--- Recrear la policy con la expresión TEXTUAL capturada en el Paso 1. Plantilla
--- (reemplazar <EXPRESION_REAL_DEL_PASO_1>; la de abajo es solo la hipótesis
--- "restringida a ADMINISTRADOR" de BIT-46, NO confirmada textualmente):
+-- Recrear la policy con la expresión REAL confirmada contra Producción
+-- (Claudy, 25 sep 2026 — NO usar is_admin(): esa función exige además
+-- perfil.activo = true, y la policy real vigente usa get_mi_rol(), que no
+-- lo exige; usarla cambiaría el comportamiento respecto del original):
 --   CREATE POLICY novedades_delete ON public.novedades_establecimiento
---     FOR DELETE TO public
---     USING (<EXPRESION_REAL_DEL_PASO_1>);
--- Hipótesis a contrastar: USING (is_admin() AND tiene_acceso_establecimiento(establecimiento_id))
+--     AS PERMISSIVE FOR DELETE TO authenticated
+--     USING (tiene_acceso_establecimiento(establecimiento_id) AND (get_mi_rol() = 'ADMINISTRADOR'));
