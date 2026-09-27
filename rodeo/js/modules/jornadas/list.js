@@ -1,4 +1,4 @@
-import { listJornadas } from '../../services/jornadas.js';
+import { listJornadas, enviarJornadaAPapelera } from '../../services/jornadas.js';
 import { escapeHtml } from '../../dashboard.js';
 
 function fmtHora(t) {
@@ -19,6 +19,9 @@ export async function mountJornadasList(contenedor, ctx) {
   const filas = jornadas
     .map((j) => {
       const esPropia = j.profesional_id === ctx.perfil.id;
+      // Solo UX: el dueño (cualquier rol) o un ADMINISTRADOR. La regla real
+      // la valida soft_delete_jornada() del lado del servidor.
+      const puedeEnviarAPapelera = esPropia || ctx.perfil.rol === 'ADMINISTRADOR';
       return `
         <tr>
           <td>${escapeHtml(j.fecha)}</td>
@@ -27,10 +30,15 @@ export async function mountJornadasList(contenedor, ctx) {
           <td>${escapeHtml(j.perfiles?.nombre ?? '—')}</td>
           <td class="rodeo-table-acciones">
             <a href="#jornadas/editar/${j.id}">${esPropia ? 'Editar' : 'Ver'}</a>
+            ${puedeEnviarAPapelera ? `<button type="button" class="rodeo-link-btn rodeo-jornada-papelera" data-id="${j.id}">Enviar a la Papelera</button>` : ''}
           </td>
         </tr>`;
     })
     .join('');
+
+  const mensaje = sessionStorage.getItem('_jornadas_msg');
+  if (mensaje) sessionStorage.removeItem('_jornadas_msg');
+  const mensajeHtml = mensaje ? `<div class="rodeo-msg-ok">${escapeHtml(mensaje)}</div>` : '';
 
   contenedor.innerHTML = `
     <div class="rodeo-card">
@@ -38,6 +46,8 @@ export async function mountJornadasList(contenedor, ctx) {
         <h2>Jornadas</h2>
         <a class="rodeo-btn" href="#jornadas/nueva">+ Nueva jornada</a>
       </div>
+      ${mensajeHtml}
+      <div id="jornadas-error" class="rodeo-error" style="display:none"></div>
       ${
         jornadas.length === 0
           ? '<p>No hay jornadas registradas todavía.</p>'
@@ -48,4 +58,22 @@ export async function mountJornadasList(contenedor, ctx) {
       }
     </div>
   `;
+
+  contenedor.querySelectorAll('.rodeo-jornada-papelera').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('¿Enviar esta jornada a la Papelera?\n\nDejará de verse en el listado. Un ADMINISTRADOR podrá restaurarla desde la Papelera.')) return;
+      btn.disabled = true;
+      const errEl = document.getElementById('jornadas-error');
+      errEl.style.display = 'none';
+      try {
+        await enviarJornadaAPapelera(btn.dataset.id);
+        sessionStorage.setItem('_jornadas_msg', 'Jornada enviada a la Papelera.');
+        mountJornadasList(contenedor, ctx);
+      } catch (e) {
+        errEl.textContent = 'Error al enviar a la Papelera: ' + e.message;
+        errEl.style.display = '';
+        btn.disabled = false;
+      }
+    });
+  });
 }

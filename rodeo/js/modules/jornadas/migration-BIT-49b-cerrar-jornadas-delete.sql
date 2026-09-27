@@ -1,0 +1,62 @@
+-- BIT-49b — Cerrar el DELETE directo sobre jornadas
+-- EJECUTAR CON CLAUDY en Supabase SQL Editor — Producción
+-- ESTADO: PREPARADA, NO APLICADA. Se autoriza POR SEPARADO de
+-- migration-BIT-49-papelera-jornadas.sql (mismo criterio que BIT-47 / BIT-48b).
+-- ORDEN DE APLICACIÓN (autorizado por Bren/KLIAM, ventana backend BIT-49,
+-- 26 sep 2026): A → validar → C → validar → B (este archivo) → validar,
+-- todo en Producción y ANTES del despliegue/merge del frontend. Aplicar
+-- solo DESPUÉS de que migration-BIT-49-papelera-jornadas.sql (A) y
+-- migration-BIT-49c-proteger-columnas-soft-delete-jornadas.sql (C) estén
+-- aplicadas y validadas — no se espera al frontend: cerrar B antes de que
+-- el frontend use el flujo nuevo evita dejar abierto el DELETE físico
+-- directo (bypass de Papelera) durante la ventana de despliegue.
+--
+-- ─── POR QUÉ ─────────────────────────────────────────────────────────────
+-- BIT-46 (Claudy, 24 Sep 2026) capturó contra Producción, textualmente:
+--   policyname=jornadas_delete · cmd=DELETE · permissive=PERMISSIVE · roles={public}
+--   USING: ((auth.uid() = profesional_id) OR is_admin())
+--   WITH CHECK: NULL
+-- Con esa policy, cualquier usuario autenticado puede emitir un DELETE FÍSICO
+-- directo por la API sobre SUS jornadas, y un ADMINISTRADOR sobre CUALQUIERA,
+-- sin Papelera ni traza. BIT-45 solo retiró la vía de la app; la capacidad
+-- siguió viva en la base. Este cierre es el que BIT-45 dejó explícitamente
+-- pendiente. hard_delete_jornada() (SECURITY DEFINER) no depende de esta
+-- policy para funcionar, así que retirarla no afecta el flujo nuevo.
+--
+-- ─── ALCANCE ESTRICTO ────────────────────────────────────────────────────
+-- Solo: DROP POLICY IF EXISTS jornadas_delete ON public.jornadas;
+-- NO toca SELECT/INSERT/UPDATE, NO toca grants, NO crea policies, NO toca
+-- visitas ni ninguna otra tabla.
+--
+-- ─── PRERREQUISITOS ──────────────────────────────────────────────────────
+--   SELECT policyname, permissive, roles, cmd, qual, with_check
+--   FROM pg_policies
+--   WHERE schemaname = 'public' AND tablename = 'jornadas' AND cmd = 'DELETE';
+--   -- Debe haber exactamente UNA policy DELETE y llamarse jornadas_delete.
+--   -- Su texto debe COINCIDIR con el bloque ROLLBACK de abajo. Si el nombre,
+--   -- la cantidad o la expresión difieren: DETENERSE, reportar y corregir el
+--   -- rollback con el texto real ANTES de aplicar (lección de BIT-48b: la
+--   -- hipótesis is_admin() no coincidía con la policy real).
+--   -- Re-ejecutar inmediatamente antes de aplicar el PASO 2.
+
+-- ── PASO 2 — CAMBIO ────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS jornadas_delete ON public.jornadas;
+
+-- ── VERIFICACIÓN POST-APLICACIÓN (SOLO LECTURA) ────────────────────────────
+--   SELECT policyname, cmd FROM pg_policies
+--   WHERE schemaname = 'public' AND tablename = 'jornadas' ORDER BY cmd, policyname;
+--   -- No debe existir ninguna policy con cmd = 'DELETE'.
+--   -- SELECT / INSERT / UPDATE deben permanecer sin cambios.
+--   SELECT relrowsecurity FROM pg_class WHERE relname = 'jornadas';
+--   -- Debe seguir en true.
+--   -- NO ejecutar un DELETE de prueba: la validación es estructural.
+
+-- ── ROLLBACK (solo recuperación; requiere autorización de Bren/KLIAM) ──────
+-- ADVERTENCIA: revertir REABRE el DELETE físico directo sobre jornadas para
+-- cualquier dueño y para ADMINISTRADOR. Solo ante una regresión causada por
+-- este cierre. Expresión REAL capturada en Producción por BIT-46 (verbatim):
+--   CREATE POLICY jornadas_delete ON public.jornadas
+--     AS PERMISSIVE FOR DELETE TO public
+--     USING (((auth.uid() = profesional_id) OR is_admin()));
+-- (Reconfirmar contra el diagnóstico inmediatamente previo; si difiere, usar
+-- el texto del diagnóstico.)

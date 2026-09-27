@@ -29,3 +29,26 @@ export async function eliminarNovedadDefinitivamente(id, confirmarAdjuntos = fal
   });
   if (error) throw error;
 }
+
+// ── Jornadas (BIT-49) ─────────────────────────────────────────────────────
+// Jornadas es una entidad personal (sin establecimiento_id): la Papelera de
+// Jornadas no se filtra por establecimiento. Mismas garantías: funciones
+// específicas, solo ADMINISTRADOR, actor por auth.uid() en el servidor.
+
+export async function listJornadasPapelera() {
+  const { data, error } = await supabase.rpc('listar_jornadas_papelera');
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function restaurarJornada(id) {
+  const { error } = await supabase.rpc('restore_jornada', { p_jornada_id: id });
+  if (error) throw error;
+}
+
+// El servidor BLOQUEA el borrado si la jornada tiene visitas relacionadas
+// (no las borra ni las modifica); el error llega con un mensaje claro.
+export async function eliminarJornadaDefinitivamente(id) {
+  const { error } = await supabase.rpc('hard_delete_jornada', { p_jornada_id: id });
+  if (error) throw error;
+}

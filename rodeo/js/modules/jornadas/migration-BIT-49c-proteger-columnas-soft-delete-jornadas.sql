@@ -1,0 +1,64 @@
+-- BIT-49c — Proteger deleted_at / deleted_by de escrituras directas (jornadas)
+-- EJECUTAR CON CLAUDY en Supabase SQL Editor — Producción
+-- ESTADO: PREPARADA. DEFINITIVAMENTE APROBADA por Bren/KLIAM (decisión BIT-49,
+-- 26 sep 2026), condicionada a que las pruebas funcionales de
+-- migration-BIT-49-papelera-jornadas.sql (A) pasen. No la pidió BIT-49
+-- originalmente; surgió de un hallazgo de la ronda de diagnóstico.
+-- ORDEN DE APLICACIÓN (ventana backend BIT-49): A → validar → C (este
+-- archivo) → validar → B → validar, todo en Producción y ANTES del
+-- despliegue/merge del frontend. Aplicar solo después de
+-- migration-BIT-49-papelera-jornadas.sql (A), no después del frontend:
+-- cerrar esta vía de escritura directa de columnas cuanto antes reduce la
+-- ventana en que un dueño podría falsificar deleted_by o des-eliminar su
+-- propia jornada por API antes de cerrar también el DELETE físico (B).
+--
+-- ─── HALLAZGO QUE LA MOTIVA ──────────────────────────────────────────────────
+-- Las policies INSERT/UPDATE de jornadas exigen solo auth.uid() = profesional_id
+-- (BIT-46) y no restringen columnas. Con las columnas deleted_at/deleted_by ya
+-- creadas, un DUEÑO (cualquier rol, no solo ADMINISTRADOR) podría, por la API
+-- y sin pasar por las funciones:
+--   * ponerse deleted_at/deleted_by a sí mismo con un deleted_by FALSIFICADO
+--     (rompe la trazabilidad "actor siempre desde auth.uid()");
+--   * des-eliminar una jornada propia con un UPDATE sin filtro por columna
+--     (saltándose el "restaurar = solo ADMINISTRADOR").
+-- En BIT-48 el residual equivalente era solo-ADMINISTRADOR y de menor alcance
+-- (el trigger de novedades además fuerza deleted_by = auth.uid()); en Jornadas
+-- no existe ese trigger confirmado y el vector alcanza a todos los dueños.
+--
+-- ─── QUÉ HACE ───────────────────────────────────────────────────────────
+-- Privilegios por columna (estándar de PostgreSQL): `authenticated` solo puede
+-- escribir por API las columnas que la app realmente escribe. deleted_at y
+-- deleted_by pasan a ser modificables ÚNICAMENTE por las funciones SECURITY
+-- DEFINER (owner postgres). No cambia ninguna policy ni ninguna función.
+--
+-- ─── PRERREQUISITOS (diagnóstico §1 y §7) ────────────────────────────────
+--   (a) columnas reales de jornadas: NINGUNA otra columna es escrita por el
+--       cliente además de profesional_id, fecha, hora_llegada, hora_salida,
+--       notas (el frontend solo escribe esas: services/jornadas.js). Si hay
+--       otra columna escrita por el cliente, agregarla a las listas o DETENERSE;
+--   (b) grants actuales: authenticated con INSERT/UPDATE a nivel tabla y sin
+--       ACL por columna (relacl / attacl del diagnóstico §7).
+--   OJO: en PostgreSQL un REVOKE de columna NO quita un GRANT de tabla; por eso
+--   primero se revoca a nivel tabla y luego se otorga por columna.
+
+-- ── PASO 2 — CAMBIO ────────────────────────────────────────────────────────
+REVOKE INSERT, UPDATE ON public.jornadas FROM authenticated;
+GRANT INSERT (profesional_id, fecha, hora_llegada, hora_salida, notas) ON public.jornadas TO authenticated;
+GRANT UPDATE (fecha, hora_llegada, hora_salida, notas) ON public.jornadas TO authenticated;
+
+-- ── VERIFICACIÓN POST-APLICACIÓN (SOLO LECTURA) ────────────────────────────
+--   SELECT c.relacl FROM pg_class c WHERE c.oid = 'public.jornadas'::regclass;
+--   SELECT a.attname, a.attacl FROM pg_attribute a
+--   WHERE a.attrelid = 'public.jornadas'::regclass AND a.attnum > 0 AND NOT a.attisdropped AND a.attacl IS NOT NULL;
+--   -- authenticated NO debe tener INSERT/UPDATE a nivel tabla; SELECT sigue igual;
+--   -- las ACL por columna deben coincidir con las listas de arriba.
+--   -- Validar en transacción (BEGIN … ROLLBACK) con sesión real: (1) INSERT y
+--   -- UPDATE normales de una jornada propia funcionan; (2) UPDATE de deleted_at
+--   -- o deleted_by por API → "permission denied for table jornadas"; (3) las
+--   -- funciones soft_delete/restore/hard_delete siguen funcionando (definer).
+
+-- ── ROLLBACK (solo recuperación; requiere autorización) ────────────
+-- Vuelve al estado estándar de Supabase (DML completo a nivel tabla):
+--   GRANT INSERT, UPDATE ON public.jornadas TO authenticated;
+-- (Los grants por columna quedan como subconjunto redundante; opcionalmente
+--  REVOKE INSERT (…), UPDATE (…) por columna si se quiere dejar la ACL limpia.)
