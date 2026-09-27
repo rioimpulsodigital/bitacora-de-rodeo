@@ -2,8 +2,14 @@
 -- EJECUTAR CON CLAUDY en Supabase SQL Editor — Producción
 -- ESTADO: PREPARADA, NO APLICADA. Se autoriza POR SEPARADO de
 -- migration-BIT-49-papelera-jornadas.sql (mismo criterio que BIT-47 / BIT-48b).
--- Aplicar solo DESPUÉS de que BIT-49 (funciones) esté aplicada y validada, y
--- de que el frontend con la Papelera de Jornadas esté desplegado.
+-- ORDEN DE APLICACIÓN (autorizado por Bren/KLIAM, ventana backend BIT-49,
+-- 26 sep 2026): A → validar → C → validar → B (este archivo) → validar,
+-- todo en Producción y ANTES del despliegue/merge del frontend. Aplicar
+-- solo DESPUÉS de que migration-BIT-49-papelera-jornadas.sql (A) y
+-- migration-BIT-49c-proteger-columnas-soft-delete-jornadas.sql (C) estén
+-- aplicadas y validadas — no se espera al frontend: cerrar B antes de que
+-- el frontend use el flujo nuevo evita dejar abierto el DELETE físico
+-- directo (bypass de Papelera) durante la ventana de despliegue.
 --
 -- ─── POR QUÉ ─────────────────────────────────────────────────────────────
 -- BIT-46 (Claudy, 24 Sep 2026) capturó contra Producción, textualmente:
