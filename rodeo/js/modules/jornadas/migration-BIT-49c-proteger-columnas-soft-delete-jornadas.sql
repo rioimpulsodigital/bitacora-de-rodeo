@@ -1,11 +1,18 @@
 -- BIT-49c — Proteger deleted_at / deleted_by de escrituras directas (jornadas)
 -- EJECUTAR CON CLAUDY en Supabase SQL Editor — Producción
--- ESTADO: PREPARADA, NO APLICADA. OPCIONAL-RECOMENDADA: requiere decisión
--- explícita de Bren/KLIAM (no la pidió BIT-49; surge de un hallazgo de esta
--- ronda). Aplicar solo después de migration-BIT-49 y con el frontend
--- desplegado.
+-- ESTADO: PREPARADA. DEFINITIVAMENTE APROBADA por Bren/KLIAM (decisión BIT-49,
+-- 26 sep 2026), condicionada a que las pruebas funcionales de
+-- migration-BIT-49-papelera-jornadas.sql (A) pasen. No la pidió BIT-49
+-- originalmente; surgió de un hallazgo de la ronda de diagnóstico.
+-- ORDEN DE APLICACIÓN (ventana backend BIT-49): A → validar → C (este
+-- archivo) → validar → B → validar, todo en Producción y ANTES del
+-- despliegue/merge del frontend. Aplicar solo después de
+-- migration-BIT-49-papelera-jornadas.sql (A), no después del frontend:
+-- cerrar esta vía de escritura directa de columnas cuanto antes reduce la
+-- ventana en que un dueño podría falsificar deleted_by o des-eliminar su
+-- propia jornada por API antes de cerrar también el DELETE físico (B).
 --
--- ─── HALLAZGO QUE LA MOTIVA ──────────────────────────────────────────────
+-- ─── HALLAZGO QUE LA MOTIVA ──────────────────────────────────────────────────
 -- Las policies INSERT/UPDATE de jornadas exigen solo auth.uid() = profesional_id
 -- (BIT-46) y no restringen columnas. Con las columnas deleted_at/deleted_by ya
 -- creadas, un DUEÑO (cualquier rol, no solo ADMINISTRADOR) podría, por la API
@@ -18,7 +25,7 @@
 -- (el trigger de novedades además fuerza deleted_by = auth.uid()); en Jornadas
 -- no existe ese trigger confirmado y el vector alcanza a todos los dueños.
 --
--- ─── QUÉ HACE ────────────────────────────────────────────────────────────
+-- ─── QUÉ HACE ───────────────────────────────────────────────────────────
 -- Privilegios por columna (estándar de PostgreSQL): `authenticated` solo puede
 -- escribir por API las columnas que la app realmente escribe. deleted_at y
 -- deleted_by pasan a ser modificables ÚNICAMENTE por las funciones SECURITY
@@ -50,7 +57,7 @@ GRANT UPDATE (fecha, hora_llegada, hora_salida, notas) ON public.jornadas TO aut
 --   -- o deleted_by por API → "permission denied for table jornadas"; (3) las
 --   -- funciones soft_delete/restore/hard_delete siguen funcionando (definer).
 
--- ── ROLLBACK (solo recuperación; requiere autorización) ────────────────────
+-- ── ROLLBACK (solo recuperación; requiere autorización) ────────────
 -- Vuelve al estado estándar de Supabase (DML completo a nivel tabla):
 --   GRANT INSERT, UPDATE ON public.jornadas TO authenticated;
 -- (Los grants por columna quedan como subconjunto redundante; opcionalmente
