@@ -14,6 +14,7 @@
 import { supabase } from '../../../../js/core/supabase-client.js';
 
 const NOMBRE_TUTOR_MUNICIPAL = 'Área de Rescate Equino de la Municipalidad de Corrientes';
+const BUCKET_FOTOS = 'paciente-fotos';
 
 // Cacheado en memoria del módulo durante la sesión de catastro -- evita
 // resolver el Tutor en cada alta cuando Etel carga muchos animales
@@ -61,48 +62,80 @@ export async function resolverTutorMunicipal(establecimientoId) {
 // migration-BIT-50-catastro-equinos.sql: animales_update excluye
 // OPERADOR_CAMPO, animales_insert no -- por eso nunca hay un UPDATE
 // posterior). El nombre de archivo lo genera el cliente porque el id del
-// Paciente todavía no existe en este punto del flujo.
+// Paciente todavía no existe en este punto del flujo. Devuelve el PATH
+// (object key) dentro del bucket -- no una URL: el bucket es privado y una
+// signed URL es temporal, no una referencia persistente (ver
+// migration-BIT-50-storage-fotos.sql).
 async function subirFotoPaciente(establecimientoId, file) {
   const extCruda = (file.name.split('.').pop() || 'jpg').toLowerCase();
   const ext = /^[a-z0-9]{1,5}$/.test(extCruda) ? extCruda : 'jpg';
   const path = `${establecimientoId}/${crypto.randomUUID()}.${ext}`;
 
   const { error } = await supabase.storage
-    .from('paciente-fotos')
+    .from(BUCKET_FOTOS)
     .upload(path, file, { contentType: file.type || 'image/jpeg', upsert: false });
   if (error) throw error;
 
   return path;
 }
 
+// Compensación de huérfanos: si el INSERT de `animales` falla DESPUÉS de
+// subir la foto, el objeto queda en Storage sin ningún Paciente que lo
+// referencie. Se intenta borrarlo de inmediato -- la policy de DELETE
+// (ver migration-BIT-50-storage-fotos.sql) solo lo permite porque el
+// propio uploader lo pide, sobre un establecimiento al que tiene acceso, Y
+// porque ningún `animales.foto_path` lo referencia todavía (si ya se
+// hubiera guardado, la policy lo protege incluso de su propio uploader).
+// Best-effort: si el borrado también falla, no se vuelve a lanzar -- el
+// usuario ya tiene el error real del INSERT: no tiene sentido tapar ese
+// mensaje con un error secundario de limpieza. El huérfano queda para la
+// revisión periódica documentada en la migración.
+async function limpiarFotoHuerfana(path) {
+  try {
+    await supabase.storage.from(BUCKET_FOTOS).remove([path]);
+  } catch {
+    // silencioso a propósito -- ver comentario arriba.
+  }
+}
+
 // Alta rápida: especie fija en 'equino' (Fundación Dolly es un rescate
 // exclusivamente equino -- no se le pregunta a Etel un dato que en este
 // flujo no varía nunca, mismo criterio que Tutor/Establecimiento
-// automáticos). `nombre` es la representación reutilizada de "Número de
-// Identificación" (ver decisión técnica en el informe de BIT-50) -- puede
-// quedar null si el caballo no tiene identificación visible; el resto de
-// la app ya muestra ese caso como "—", no como un error.
+// automáticos).
+//
+// `numero_identificacion` es un atributo propio, DISTINTO de `nombre`
+// (revisión estratégica de BIT-50, 30-09-2026): `nombre` es el nombre
+// propio del animal en el resto de la app (selectores de Atenciones,
+// listado de Pacientes) -- una caravana/marca de campo no es un nombre.
+// Este flujo nunca escribe `nombre`. Puede quedar `numero_identificacion
+// = null` si el caballo no tiene identificación visible; el resto de la
+// app ya muestra ese caso como "—", no como un error -- no se fabrica un
+// identificador falso.
 export async function crearEquinoCatastro(campos, establecimientoId, tutorResponsableId) {
-  let fotoUrl = null;
+  let fotoPath = null;
   if (campos.fotoFile) {
-    fotoUrl = await subirFotoPaciente(establecimientoId, campos.fotoFile);
+    fotoPath = await subirFotoPaciente(establecimientoId, campos.fotoFile);
   }
 
   const { data, error } = await supabase
     .from('animales')
     .insert({
       especie: 'equino',
-      nombre: campos.sinIdentificacion ? null : (campos.nombre?.trim() || null),
+      numero_identificacion: campos.sinIdentificacion ? null : (campos.numeroIdentificacion?.trim() || null),
       sexo: campos.sexo || null,
       pelaje: campos.pelaje?.trim() || null,
       edad_aproximada_anios: campos.edadAproximadaAnios,
-      foto_url: fotoUrl,
+      foto_path: fotoPath,
       tutor_responsable_id: tutorResponsableId,
       establecimiento_actual_id: establecimientoId,
     })
-    .select('id, nombre')
+    .select('id, numero_identificacion')
     .single();
-  if (error) throw error;
+
+  if (error) {
+    if (fotoPath) await limpiarFotoHuerfana(fotoPath);
+    throw error;
+  }
 
   return data;
 }

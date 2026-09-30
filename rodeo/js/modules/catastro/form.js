@@ -48,7 +48,7 @@ export async function mountCatastroForm(contenedor, ctx) {
 
       <form id="catastro-form">
         <label class="form-label">Número de identificación</label>
-        <input class="form-field" type="text" id="cat-nombre" name="nombre" placeholder="Caravana, tatuaje, microchip…" autocomplete="off">
+        <input class="form-field" type="text" id="cat-numero-id" name="numero_identificacion" placeholder="Caravana, tatuaje, microchip…" autocomplete="off">
         <label class="form-check-row">
           <input type="checkbox" id="cat-sin-id">
           <span>Sin identificación visible</span>
@@ -79,7 +79,7 @@ export async function mountCatastroForm(contenedor, ctx) {
     </div>`;
 
   const formEl = document.getElementById('catastro-form');
-  const nombreInput = document.getElementById('cat-nombre');
+  const numeroIdInput = document.getElementById('cat-numero-id');
   const sinIdCheckbox = document.getElementById('cat-sin-id');
   const fotoInput = document.getElementById('cat-foto');
   const fotoPreview = document.getElementById('cat-foto-preview');
@@ -125,8 +125,8 @@ export async function mountCatastroForm(contenedor, ctx) {
   formEl.addEventListener('change', marcarDirty);
 
   sinIdCheckbox.addEventListener('change', () => {
-    nombreInput.disabled = sinIdCheckbox.checked;
-    if (sinIdCheckbox.checked) nombreInput.value = '';
+    numeroIdInput.disabled = sinIdCheckbox.checked;
+    if (sinIdCheckbox.checked) numeroIdInput.value = '';
   });
 
   function limpiarFoto() {
@@ -162,12 +162,12 @@ export async function mountCatastroForm(contenedor, ctx) {
 
   function resetearParaProximoCaballo() {
     formEl.reset();
-    nombreInput.disabled = false;
+    numeroIdInput.disabled = false;
     limpiarFoto();
     estadoBoton = 'pristine';
     aplicarEstadoBoton();
     errorEl.textContent = '';
-    nombreInput.focus();
+    numeroIdInput.focus();
   }
 
   formEl.addEventListener('submit', async (e) => {
@@ -179,7 +179,7 @@ export async function mountCatastroForm(contenedor, ctx) {
     const edadRaw = fd.get('edad_aproximada_anios');
 
     const campos = {
-      nombre: fd.get('nombre'),
+      numeroIdentificacion: fd.get('numero_identificacion'),
       sinIdentificacion: sinIdCheckbox.checked,
       pelaje: fd.get('pelaje'),
       sexo: fd.get('sexo') || null,
@@ -194,7 +194,7 @@ export async function mountCatastroForm(contenedor, ctx) {
       const creado = await crearEquinoCatastro(campos, establecimientoId, tutorId);
       estadoBoton = 'saved';
       aplicarEstadoBoton();
-      successEl.textContent = `✓ Guardado — ${creado.nombre ?? 'sin identificación'}. Podés cargar el próximo caballo.`;
+      successEl.textContent = `✓ Guardado — ${creado.numero_identificacion ?? 'sin identificación'}. Podés cargar el próximo caballo.`;
       successEl.style.display = '';
       setTimeout(() => {
         successEl.style.display = 'none';

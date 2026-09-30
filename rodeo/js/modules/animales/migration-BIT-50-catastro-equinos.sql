@@ -1,36 +1,60 @@
 -- BIT-50 — Catastro equino Fundación Dolly: columnas nuevas en `animales`
 -- EJECUTAR CON CLAUDY en Supabase SQL Editor — Producción
 -- ESTADO: PREPARADA, NO APLICADA. Requiere autorización explícita de Bren/KLIAM.
+-- VERSIÓN 2 (30-09-2026) -- reemplaza la versión anterior tras la revisión
+-- estratégica de Bren/KLIAM. Cambios respecto a la v1: `foto_url` → `foto_path`
+-- (referencia persistente, no una URL temporal) y se agrega `numero_identificacion`
+-- como columna propia, en vez de reutilizar `animales.nombre` (ver punto 2).
 --
 -- ─── OBJETIVO ────────────────────────────────────────────────────────────
 -- Agregar a `animales` las columnas mínimas necesarias para el catastro
 -- rápido de equinos de Fundación Dolly, reutilizando el modelo de Paciente
 -- Animal vigente (BIT-07/BIT-11) en vez de crear una entidad paralela.
 --
--- ─── DECISIÓN — QUÉ NO SE AGREGA ─────────────────────────────────────────
--- "Número de Identificación" NO es una columna nueva: se decidió reutilizar
--- `animales.nombre` (ya existente, ya nullable, ya es el campo que consumen
--- los selectores de Atenciones/Novedades para mostrar el Paciente). Crear
--- una columna paralela habría dejado estos equinos mostrándose como "Sin
--- identificar" en el resto de la app. Ver informe de BIT-50 (Notion),
--- sección "Decisión técnica de integración", punto 2.
+-- ─── DECISIÓN — NÚMERO DE IDENTIFICACIÓN NO REUTILIZA `nombre` ──────────
+-- La v1 de esta migración reutilizaba `animales.nombre` para "Número de
+-- Identificación". Se revirtió esa decisión: `nombre` es, en el resto de
+-- la app (selectores de Atenciones/Novedades, listado de Pacientes), el
+-- nombre propio del animal -- un concepto distinto de una caravana/marca
+-- de campo. Forzar un número de identificación en `nombre` haría que ese
+-- valor se muestre como si fuera el nombre del animal en toda la
+-- aplicación, y le impediría recibir después un nombre real sin perder el
+-- dato de identificación.
 --
--- ─── COLUMNAS QUE SÍ SE AGREGAN (todas nullable, sin CHECK, sin default) ──
+-- Hallazgo de contexto (Notion, BIT-38 "Ficha de Paciente con historial
+-- clínico", 🔒 Pendiente, sin implementar): sus propias notas ya definen
+-- el modelo de identidad correcto -- UUID técnico + un futuro "Código de
+-- paciente" visible correlativo (PAC-000001, territorio de BIT-38, NO de
+-- BIT-50) + "caravana, microchip, tatuaje u otros identificadores físicos
+-- ... como atributos complementarios, no como ID primario del sistema".
+-- `numero_identificacion` es exactamente ese atributo complementario.
+-- BIT-50 no crea el código correlativo -- solo el atributo físico.
+--
+-- ─── COLUMNAS QUE SE AGREGAN (todas nullable, sin CHECK, sin default) ────
+-- `numero_identificacion` text -- caravana/tatuaje/marca visible tal cual
+--                            la ve Etel en el animal. Texto libre (no
+--                            integer): existen marcas alfanuméricas. NULL
+--                            explícito = "sin identificación visible" --
+--                            nunca se fabrica un número falso. El listado
+--                            general de Pacientes ya renderiza NULL como
+--                            "—", no como error.
 -- `sexo` text            -- catálogo sugerido en frontend (Macho/Hembra/No
 --                            determinado), SIN CHECK rígido en la base --
 --                            mismo criterio ya aprobado por Bren en BIT-42
 --                            para `categoria` de Visitas: no bloquear casos
 --                            futuros no previstos. No resuelve BIT-14 (que
---                            además vincula Categoría↔Especie); esto es solo
---                            un valor plano en Pacientes.
+--                            además vincula Categoría↔Especie, y sigue
+--                            🔒 Pendiente sin contenido definido -- no hay
+--                            una decisión previa que este cambio deba
+--                            respetar); esto es solo un valor plano en
+--                            Pacientes.
 -- `pelaje` text           -- hoy vive informalmente dentro del textarea
 --                            `notas` ("Notas / Identificación (caravana,
---                            pelaje, etc.)", animales/form.js). Mezclarlo
---                            todo en `notas` habría hecho el catastro
---                            inconsultable como dato estructurado -- se
---                            decidió una columna dedicada mínima, sin
---                            catálogo (no se diseña un catálogo veterinario
---                            general en BIT-50).
+--                            pelaje, etc.)", animales/form.js -- hint que
+--                            se actualiza en esta misma tarea, ver más
+--                            abajo). Columna dedicada mínima, sin catálogo
+--                            (no se diseña un catálogo veterinario general
+--                            en BIT-50).
 -- `edad_aproximada_anios` smallint -- años aproximados, NUNCA una fecha de
 --                            nacimiento inventada. `fecha_nacimiento` ya
 --                            existe pero representa una fecha precisa real;
@@ -39,12 +63,17 @@
 --                            en el alcance de BIT-50). Sin CHECK de rango --
 --                            terreno no debe bloquearse por un valor límite
 --                            no previsto.
--- `foto_url` text         -- ruta dentro del bucket de Storage (no una URL
---                            pública ni base64). Ver
---                            migration-BIT-50-storage-fotos.sql para el
---                            bucket y las policies. Se completa en el MISMO
---                            INSERT que crea el Paciente (nunca vía UPDATE
---                            posterior) -- ver nota de RLS abajo.
+-- `foto_path` text        -- referencia PERSISTENTE al archivo: el object
+--                            key dentro del bucket privado `paciente-fotos`
+--                            (ver migration-BIT-50-storage-fotos.sql), NO
+--                            una URL. El bucket es privado -- una signed
+--                            URL es temporal por diseño, así que no es apta
+--                            como dato permanente en la base. La URL de
+--                            acceso se resuelve dinámicamente (createSignedUrl)
+--                            en el momento de mostrar la foto, no se guarda.
+--                            Se completa en el MISMO INSERT que crea el
+--                            Paciente (nunca vía UPDATE posterior) -- ver
+--                            nota de RLS abajo.
 --
 -- ─── POR QUÉ NO HAY UPDATE POSTERIOR PARA LA FOTO (hallazgo de RLS) ──────
 -- `animales_update` está restringida a ADMINISTRADOR/PROFESIONAL desde
@@ -52,37 +81,64 @@
 -- OPERADOR_CAMPO no puede hacer UPDATE sobre `animales`, aunque SÍ puede
 -- hacer INSERT (`animales_insert` no restringe por rol). Si el flujo de
 -- Catastro subiera la foto después de crear el Paciente (INSERT sin foto +
--- UPDATE con la URL), un OPERADOR_CAMPO podría crear el equino pero jamás
--- guardarle la foto -- RLS se lo bloquearía en silencio o con error. Por
--- eso el frontend sube la foto a Storage PRIMERO (con un id generado en el
--- cliente, no el id del Paciente, que todavía no existe) y recién después
--- hace un único INSERT que ya incluye `foto_url` -- funciona igual para
--- los tres roles, sin tocar ninguna policy de `animales`.
+-- UPDATE con la referencia), un OPERADOR_CAMPO podría crear el equino pero
+-- jamás guardarle la foto -- RLS se lo bloquearía en silencio o con error.
+-- Por eso el frontend sube la foto a Storage PRIMERO (con un id generado en
+-- el cliente, no el id del Paciente, que todavía no existe) y recién
+-- después hace un único INSERT que ya incluye `foto_path` -- funciona igual
+-- para los tres roles, sin tocar ninguna policy de `animales`. Si ese
+-- INSERT falla, el frontend compensa borrando el objeto huérfano (ver
+-- migration-BIT-50-storage-fotos.sql, policy de DELETE).
 --
 -- ─── PRERREQUISITO ───────────────────────────────────────────────────────
--- Correr primero el PASO 1 de acá y confirmar que las 4 columnas no existen
--- todavía con otro tipo/nombre.
+-- Correr primero el PASO 1 de acá y confirmar que las 5 columnas no existen
+-- todavía con otro tipo/nombre. Si en el entorno ya se aplicó la v1 de esta
+-- migración (con `nombre` reutilizado y `foto_url`), ver el PASO 2b de
+-- corrección más abajo en vez del PASO 2 de alta limpia.
 
 -- ── PASO 1 (OBLIGATORIO, SOLO LECTURA) ─────────────────────────────────────
 SELECT column_name, data_type, is_nullable, column_default
 FROM information_schema.columns
 WHERE table_schema = 'public' AND table_name = 'animales'
 ORDER BY ordinal_position;
--- Confirmar en particular que NO existen ya: sexo, pelaje,
--- edad_aproximada_anios, foto_url (con cualquier nombre similar). Si existe
--- algo equivalente con otro nombre: DETENERSE y reportar antes de aplicar.
+-- Confirmar en particular que NO existen ya: numero_identificacion, sexo,
+-- pelaje, edad_aproximada_anios, foto_path (con cualquier nombre similar).
+-- Si existe algo equivalente con otro nombre, o si `foto_url` ya existe de
+-- una aplicación previa de la v1: DETENERSE y usar el PASO 2b en vez del
+-- PASO 2, y reportar antes de continuar.
 
--- ── PASO 2 — COLUMNAS (idempotente) ────────────────────────────────────────
+-- ── PASO 2 — COLUMNAS, ALTA LIMPIA (idempotente) ───────────────────────────
+-- Usar este paso solo si el PASO 1 confirmó que ninguna de las 5 columnas
+-- existe todavía (entorno donde nunca se aplicó la v1 de esta migración).
+ALTER TABLE public.animales ADD COLUMN IF NOT EXISTS numero_identificacion text;
 ALTER TABLE public.animales ADD COLUMN IF NOT EXISTS sexo text;
 ALTER TABLE public.animales ADD COLUMN IF NOT EXISTS pelaje text;
 ALTER TABLE public.animales ADD COLUMN IF NOT EXISTS edad_aproximada_anios smallint;
-ALTER TABLE public.animales ADD COLUMN IF NOT EXISTS foto_url text;
+ALTER TABLE public.animales ADD COLUMN IF NOT EXISTS foto_path text;
+
+-- ── PASO 2b — CORRECCIÓN, si la v1 ya se aplicó en este entorno ────────────
+-- Usar este paso EN VEZ DEL PASO 2 solo si el PASO 1 muestra `nombre`
+-- reutilizado con datos de catastro y/o una columna `foto_url` ya existente.
+-- No debería ser el caso en Producción (la v1 nunca se aplicó -- nada de
+-- BIT-50 se aplicó todavía), pero se documenta por completitud si esta
+-- migración se corre sobre un entorno de prueba que sí la tenía.
+--
+--   ALTER TABLE public.animales ADD COLUMN IF NOT EXISTS numero_identificacion text;
+--   ALTER TABLE public.animales ADD COLUMN IF NOT EXISTS foto_path text;
+--   -- Si existen filas de prueba con foto_url poblado, migrar el valor:
+--   -- UPDATE public.animales SET foto_path = foto_url WHERE foto_url IS NOT NULL AND foto_path IS NULL;
+--   ALTER TABLE public.animales ADD COLUMN IF NOT EXISTS sexo text;
+--   ALTER TABLE public.animales ADD COLUMN IF NOT EXISTS pelaje text;
+--   ALTER TABLE public.animales ADD COLUMN IF NOT EXISTS edad_aproximada_anios smallint;
+--   -- foto_url y el eventual reuso de `nombre` NO se limpian automáticamente
+--   -- acá -- requiere confirmar primero que ningún Paciente real depende de
+--   -- esos valores. Ver ROLLBACK más abajo.
 
 -- ── VERIFICACIÓN POST-APLICACIÓN (SOLO LECTURA) ────────────────────────────
 --   SELECT column_name, data_type, is_nullable FROM information_schema.columns
 --   WHERE table_schema = 'public' AND table_name = 'animales'
---     AND column_name IN ('sexo','pelaje','edad_aproximada_anios','foto_url');
---   -- Las 4 deben existir, todas is_nullable = YES, sin CHECK asociado.
+--     AND column_name IN ('numero_identificacion','sexo','pelaje','edad_aproximada_anios','foto_path');
+--   -- Las 5 deben existir, todas is_nullable = YES, sin CHECK asociado.
 --   SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint
 --   WHERE conrelid = 'public.animales'::regclass AND contype = 'c';
 --   -- No debe aparecer ningún CHECK nuevo sobre estas columnas.
@@ -94,10 +150,12 @@ ALTER TABLE public.animales ADD COLUMN IF NOT EXISTS foto_url text;
 -- Solo si NINGÚN Paciente real llegó a usar estas columnas todavía (si ya
 -- hay datos de Fundación Dolly cargados, NO ejecutar -- se perderían):
 --   SELECT count(*) FROM animales
---   WHERE sexo IS NOT NULL OR pelaje IS NOT NULL
---      OR edad_aproximada_anios IS NOT NULL OR foto_url IS NOT NULL;
+--   WHERE numero_identificacion IS NOT NULL OR sexo IS NOT NULL
+--      OR pelaje IS NOT NULL OR edad_aproximada_anios IS NOT NULL
+--      OR foto_path IS NOT NULL;
 --   -- Debe dar 0 antes de considerar el DROP.
+--   ALTER TABLE public.animales DROP COLUMN IF EXISTS numero_identificacion;
 --   ALTER TABLE public.animales DROP COLUMN IF EXISTS sexo;
 --   ALTER TABLE public.animales DROP COLUMN IF EXISTS pelaje;
 --   ALTER TABLE public.animales DROP COLUMN IF EXISTS edad_aproximada_anios;
---   ALTER TABLE public.animales DROP COLUMN IF EXISTS foto_url;
+--   ALTER TABLE public.animales DROP COLUMN IF EXISTS foto_path;

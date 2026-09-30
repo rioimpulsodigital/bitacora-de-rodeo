@@ -85,7 +85,7 @@ export async function mountAnimalForm(contenedor, ctx, id) {
         <label class="form-label">Fecha de nacimiento (opcional)</label>
         <input class="form-field" type="date" name="fecha_nacimiento" value="${animal?.fecha_nacimiento ?? ''}">
 
-        <label class="form-label">Notas / Identificación (caravana, pelaje, etc.)</label>
+        <label class="form-label">Notas</label>
         <textarea class="act-textarea" name="notas" rows="3" style="width:100%;margin-bottom:16px">${animal?.notas ? escapeHtml(animal.notas) : ''}</textarea>
 
         <label class="form-label">Tutor Responsable <span class="rodeo-required">*</span></label>
