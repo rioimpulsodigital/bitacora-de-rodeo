@@ -13,6 +13,7 @@ import { renderHeaderUsuario, renderHeaderEstablecimiento, renderSinPerfil, moun
 import { registerRoute, iniciarRouter, resolverRuta } from './router.js';
 import { registrarRutasJornadas } from './modules/jornadas/index.js';
 import { registrarRutasAnimales } from './modules/animales/index.js';
+import { registrarRutasCatastro } from './modules/catastro/index.js';
 import { registrarRutasVisitas } from './modules/visitas/index.js';
 import { registrarRutasObservaciones } from './modules/observaciones/index.js';
 import { registrarRutasNovedades } from './modules/novedades/index.js';
@@ -65,6 +66,7 @@ async function iniciar() {
   registerRoute('dashboard', () => mountDashboard(contenedor, ctx));
   registrarRutasJornadas(contenedor, ctx);
   registrarRutasAnimales(contenedor, ctx);
+  registrarRutasCatastro(contenedor, ctx);
   registrarRutasVisitas(contenedor, ctx);
   registrarRutasObservaciones(contenedor, ctx);
   registrarRutasNovedades(contenedor, ctx);
