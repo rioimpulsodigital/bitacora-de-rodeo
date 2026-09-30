@@ -8,6 +8,7 @@ import {
   getEstablecimientosAccesibles,
   getEstablecimientoActivoId,
   setEstablecimientoActivoId,
+  tieneCatastroEquino,
 } from './services/establecimientos.js';
 import { renderHeaderUsuario, renderHeaderEstablecimiento, renderSinPerfil, mountDashboard } from './dashboard.js';
 import { registerRoute, iniciarRouter, resolverRuta } from './router.js';
@@ -56,9 +57,18 @@ async function iniciar() {
     },
   };
 
+  // Catastro Equino (BIT-50): la entrada del menú sigue al establecimiento
+  // ACTIVO, no al usuario. La protección real de la ruta está en el módulo.
+  function actualizarNavCatastro() {
+    const activo = establecimientos.find((e) => e.id === activoId);
+    document.getElementById('rodeo-nav-catastro').style.display = tieneCatastroEquino(activo) ? '' : 'none';
+  }
+  actualizarNavCatastro();
+
   renderHeaderEstablecimiento(establecimientos, activoId, (id) => {
     activoId = id;
     setEstablecimientoActivoId(id);
+    actualizarNavCatastro();
     resolverRuta();
   });
 

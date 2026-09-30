@@ -1,10 +1,11 @@
-// Servicios del Módulo Catastro (BIT-50) — alta rápida de equinos de
-// Fundación Dolly como Paciente Animal (`animales`).
+// Servicios del Módulo Catastro Equino (BIT-50) — alta rápida de equinos
+// como Paciente Animal (`animales`) en los establecimientos que tienen la
+// capacidad habilitada (`establecimientos.catastro_equino_habilitado`).
 //
 // Autonomía de módulo (convención vigente en el proyecto, ver
 // modules/animales, modules/visitas): este servicio NO importa
-// modules/animales/services.js -- hace su propio acceso a `animales` y
-// `personas`, igual que el resto de los módulos que ya replican sus propios
+// modules/animales/services.js -- hace su propio acceso a `animales`,
+// igual que el resto de los módulos que ya replican sus propios
 // selectores en vez de cruzar imports entre módulos de dominio.
 //
 // Estos equinos son Paciente Animal común y corriente -- mismas tablas,
@@ -13,49 +14,67 @@
 
 import { supabase } from '../../../../js/core/supabase-client.js';
 
-const NOMBRE_TUTOR_MUNICIPAL = 'Área de Rescate Equino de la Municipalidad de Corrientes';
 const BUCKET_FOTOS = 'paciente-fotos';
+const MAX_FOTO_BYTES = 8 * 1024 * 1024; // mismo límite que el bucket (8 MB)
+const MIME_FOTO_PERMITIDOS = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
 
-// Cacheado en memoria del módulo durante la sesión de catastro -- evita
-// resolver el Tutor en cada alta cuando Etel carga muchos animales
-// seguidos. Se pierde al recargar la página (comportamiento esperado: se
-// vuelve a resolver, es una sola consulta liviana).
-let tutorIdCache = null;
-
-// Resuelve el id de la Persona-Tutor municipal por nombre exacto (RLS de
-// `personas` no está scopeada por establecimiento -- ver
-// migration-BIT-11-fix-personas-rls.sql -- así que esta búsqueda no
-// necesita el establecimiento para el SELECT). Si por algún motivo la
-// migración de alta (migration-BIT-50-establecimiento-dolly.sql) todavía
-// no corrió en el entorno actual, cae a crearla vía la RPC existente --
-// nunca un INSERT directo sobre `personas` (vía cerrada en BIT-11).
-export async function resolverTutorMunicipal(establecimientoId) {
-  if (tutorIdCache) return tutorIdCache;
-
-  const { data, error } = await supabase
-    .from('personas')
-    .select('id')
-    .eq('nombre', NOMBRE_TUTOR_MUNICIPAL)
-    .maybeSingle();
-  if (error) throw error;
-
-  if (data) {
-    tutorIdCache = data.id;
-    return tutorIdCache;
+// Error con mensaje ya listo para mostrar. `causa` conserva el error
+// original (Supabase/Storage/red) para diagnóstico técnico: además se
+// loguea completo en consola.
+export class ErrorCatastro extends Error {
+  constructor(mensaje, causa) {
+    super(mensaje);
+    this.name = 'ErrorCatastro';
+    this.causa = causa ?? null;
   }
+}
 
-  const { data: nueva, error: errorRpc } = await supabase
-    .rpc('crear_persona_con_establecimiento', {
-      p_nombre: NOMBRE_TUTOR_MUNICIPAL,
-      p_telefono: null,
-      p_email: null,
-      p_establecimiento_id: establecimientoId,
-    })
-    .single();
-  if (errorRpc) throw errorRpc;
+// Validación previa al upload: el servidor igual rechaza (bucket con
+// límite y MIME), esto solo evita subir 8 MB por datos móviles para
+// enterarse recién después. Si el navegador no informa `type` (pasa con
+// algunos HEIC), se deja decidir al servidor.
+export function validarFoto(file) {
+  if (file.size > MAX_FOTO_BYTES) {
+    return 'La foto pesa más de 8 MB. Sacala de nuevo o elegí una más liviana.';
+  }
+  if (file.type && !MIME_FOTO_PERMITIDOS.includes(file.type)) {
+    return 'Formato de foto no permitido. Usá JPG, PNG, WebP o HEIC.';
+  }
+  return null;
+}
 
-  tutorIdCache = nueva.id;
-  return tutorIdCache;
+// Traduce errores esperables de este flujo a español. No oculta el error
+// real: se loguea completo en consola y viaja en `ErrorCatastro.causa`.
+function traducirError(err, etapa) {
+  console.error(`[Catastro Equino] error en ${etapa}:`, err);
+  const msg = String(err?.message ?? '').toLowerCase();
+  const code = String(err?.code ?? err?.statusCode ?? err?.status ?? '');
+
+  if (/failed to fetch|networkerror|network request failed|load failed/.test(msg)) {
+    return new ErrorCatastro('No hay conexión con el servidor. Revisá tu señal e intentá de nuevo.', err);
+  }
+  if (etapa === 'foto') {
+    if (/maximum allowed size|payload too large|too large/.test(msg) || code === '413') {
+      return new ErrorCatastro('La foto pesa más de 8 MB. Sacala de nuevo o elegí una más liviana.', err);
+    }
+    if (/mime type|not supported|invalid mime|unsupported/.test(msg) || code === '415') {
+      return new ErrorCatastro('Formato de foto no permitido. Usá JPG, PNG, WebP o HEIC.', err);
+    }
+    if (/row-level security|unauthorized|not authorized|violates/.test(msg) || code === '403' || code === '42501') {
+      return new ErrorCatastro('No tenés permiso para subir fotos en este establecimiento.', err);
+    }
+    return new ErrorCatastro('No se pudo subir la foto. El caballo no se guardó; intentá de nuevo.', err);
+  }
+  if (code === '42501' || /row-level security|permission denied/.test(msg)) {
+    return new ErrorCatastro('No tenés permiso para registrar pacientes en este establecimiento.', err);
+  }
+  if (code === '22003' || code === '22001' || code === '23514' || /out of range|check constraint|too long/.test(msg)) {
+    return new ErrorCatastro('Alguno de los datos está fuera de rango (revisá la edad y los textos). El caballo no se guardó.', err);
+  }
+  if (code === '23502') {
+    return new ErrorCatastro('La base de datos pide un dato obligatorio que este formulario no envía. Avisá al equipo técnico.', err);
+  }
+  return new ErrorCatastro('No se pudo guardar el caballo. Intentá de nuevo; si sigue fallando, avisá al equipo técnico.', err);
 }
 
 // Sube la foto ANTES de crear el Paciente (ver nota de RLS en
@@ -74,7 +93,7 @@ async function subirFotoPaciente(establecimientoId, file) {
   const { error } = await supabase.storage
     .from(BUCKET_FOTOS)
     .upload(path, file, { contentType: file.type || 'image/jpeg', upsert: false });
-  if (error) throw error;
+  if (error) throw traducirError(error, 'foto');
 
   return path;
 }
@@ -98,10 +117,14 @@ async function limpiarFotoHuerfana(path) {
   }
 }
 
-// Alta rápida: especie fija en 'equino' (Fundación Dolly es un rescate
-// exclusivamente equino -- no se le pregunta a Etel un dato que en este
-// flujo no varía nunca, mismo criterio que Tutor/Establecimiento
-// automáticos).
+// Alta rápida: especie fija en 'equino' porque el módulo ES el catastro
+// equino -- no se pregunta un dato que en este flujo no varía nunca.
+//
+// Tutor Responsable: este flujo NO lo envía (queda NULL). Un organismo
+// interviniente no es necesariamente el Tutor del animal, y no se inventa
+// una relación para satisfacer el modelo; se completa después desde la
+// edición normal del Paciente. Requiere que `tutor_responsable_id` admita
+// NULL en la base -- ver verificacion-BIT-50-tutor-null.sql.
 //
 // `numero_identificacion` es un atributo propio, DISTINTO de `nombre`
 // (revisión estratégica de BIT-50, 30-09-2026): `nombre` es el nombre
@@ -111,7 +134,7 @@ async function limpiarFotoHuerfana(path) {
 // = null` si el caballo no tiene identificación visible; el resto de la
 // app ya muestra ese caso como "—", no como un error -- no se fabrica un
 // identificador falso.
-export async function crearEquinoCatastro(campos, establecimientoId, tutorResponsableId) {
+export async function crearEquinoCatastro(campos, establecimientoId) {
   let fotoPath = null;
   if (campos.fotoFile) {
     fotoPath = await subirFotoPaciente(establecimientoId, campos.fotoFile);
@@ -126,7 +149,6 @@ export async function crearEquinoCatastro(campos, establecimientoId, tutorRespon
       pelaje: campos.pelaje?.trim() || null,
       edad_aproximada_anios: campos.edadAproximadaAnios,
       foto_path: fotoPath,
-      tutor_responsable_id: tutorResponsableId,
       establecimiento_actual_id: establecimientoId,
     })
     .select('id, numero_identificacion')
@@ -134,7 +156,7 @@ export async function crearEquinoCatastro(campos, establecimientoId, tutorRespon
 
   if (error) {
     if (fotoPath) await limpiarFotoHuerfana(fotoPath);
-    throw error;
+    throw traducirError(error, 'guardar');
   }
 
   return data;

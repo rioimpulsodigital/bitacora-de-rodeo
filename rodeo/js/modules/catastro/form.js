@@ -1,4 +1,5 @@
-import { resolverTutorMunicipal, crearEquinoCatastro } from './services.js';
+import { crearEquinoCatastro, validarFoto } from './services.js';
+import { tieneCatastroEquino } from '../../services/establecimientos.js';
 import { escapeHtml } from '../../dashboard.js';
 
 const SEXO_OPTS = [
@@ -18,16 +19,19 @@ export async function mountCatastroForm(contenedor, ctx) {
     return;
   }
 
-  let tutorId;
-  try {
-    tutorId = await resolverTutorMunicipal(establecimientoId);
-  } catch (e) {
-    contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">Error al preparar el catastro: ${escapeHtml(e.message)}</p></div>`;
+  // Protección real de la ruta (BIT-50): ocultar el menú no alcanza, #catastro
+  // puede escribirse a mano o quedar abierto al cambiar de establecimiento.
+  if (!tieneCatastroEquino(establecimientoActivo)) {
+    contenedor.innerHTML = `
+      <div class="rodeo-card">
+        <h2>🐴 Catastro Equino</h2>
+        <p class="rodeo-error">Catastro Equino no está habilitado para <strong>${escapeHtml(establecimientoActivo.nombre)}</strong>. Elegí otro establecimiento arriba o volvé al listado de Pacientes.</p>
+        <a href="#animales" class="rodeo-link-btn" style="margin-left:0">Ir a Pacientes</a>
+      </div>`;
     return;
   }
 
   const nombreEstablecimiento = establecimientoActivo.nombre;
-  const pareceDolly = /doll?y/i.test(nombreEstablecimiento);
 
   const sexoRadios = SEXO_OPTS.map(
     (o) => `
@@ -39,11 +43,10 @@ export async function mountCatastroForm(contenedor, ctx) {
 
   contenedor.innerHTML = `
     <div class="rodeo-card rodeo-catastro-form">
-      <h2>🐴 Catastro Fundación Dolly — Nuevo Paciente</h2>
+      <h2>🐴 Catastro Equino — Nuevo Paciente</h2>
 
-      <div class="rodeo-catastro-establecimiento ${pareceDolly ? '' : 'rodeo-catastro-establecimiento-alerta'}">
+      <div class="rodeo-catastro-establecimiento">
         Establecimiento activo: <strong>${escapeHtml(nombreEstablecimiento)}</strong>
-        ${pareceDolly ? '' : '<br>⚠️ Este nombre no parece "Fundación Dolly". Si corresponde, cambiá el establecimiento activo arriba antes de guardar.'}
       </div>
 
       <form id="catastro-form">
@@ -64,7 +67,14 @@ export async function mountCatastroForm(contenedor, ctx) {
         <input class="form-field" type="number" name="edad_aproximada_anios" min="0" max="60" inputmode="numeric" placeholder="Aproximada, no hace falta precisión">
 
         <label class="form-label">Fotografía</label>
-        <input class="rodeo-catastro-foto-input" type="file" accept="image/*" capture="environment" id="cat-foto">
+        <div class="rodeo-catastro-foto-acciones">
+          <button type="button" class="rodeo-catastro-foto-btn" id="cat-foto-camara-btn">📷 Sacar foto</button>
+          <button type="button" class="rodeo-catastro-foto-btn" id="cat-foto-galeria-btn">🖼️ Elegir de la galería</button>
+        </div>
+        <!-- Dos inputs a propósito: 'capture' fuerza la cámara en Android/iOS y
+             con un solo input no hay forma portable de ofrecer también galería. -->
+        <input type="file" accept="image/*" capture="environment" id="cat-foto-camara" hidden>
+        <input type="file" accept="image/*" id="cat-foto-galeria" hidden>
         <img id="cat-foto-preview" class="rodeo-catastro-foto-preview" style="display:none" alt="Vista previa">
         <button type="button" class="rodeo-link-btn" id="cat-foto-quitar" style="display:none">Quitar foto</button>
 
@@ -81,7 +91,8 @@ export async function mountCatastroForm(contenedor, ctx) {
   const formEl = document.getElementById('catastro-form');
   const numeroIdInput = document.getElementById('cat-numero-id');
   const sinIdCheckbox = document.getElementById('cat-sin-id');
-  const fotoInput = document.getElementById('cat-foto');
+  const fotoCamaraInput = document.getElementById('cat-foto-camara');
+  const fotoGaleriaInput = document.getElementById('cat-foto-galeria');
   const fotoPreview = document.getElementById('cat-foto-preview');
   const fotoQuitarBtn = document.getElementById('cat-foto-quitar');
   const submitBtn = document.getElementById('catastro-submit');
@@ -131,7 +142,8 @@ export async function mountCatastroForm(contenedor, ctx) {
 
   function limpiarFoto() {
     fotoFile = null;
-    fotoInput.value = '';
+    fotoCamaraInput.value = '';
+    fotoGaleriaInput.value = '';
     if (fotoPreviewUrl) URL.revokeObjectURL(fotoPreviewUrl);
     fotoPreviewUrl = null;
     fotoPreview.src = '';
@@ -139,21 +151,30 @@ export async function mountCatastroForm(contenedor, ctx) {
     fotoQuitarBtn.style.display = 'none';
   }
 
-  fotoInput.addEventListener('change', () => {
-    const file = fotoInput.files?.[0] ?? null;
+  // Cámara y galería comparten el mismo manejo: la última elección gana.
+  function alElegirFoto(input, otroInput) {
+    const file = input.files?.[0] ?? null;
+    if (!file) return; // el usuario canceló el selector: se conserva la foto previa
+    const problema = validarFoto(file);
+    if (problema) {
+      input.value = '';
+      errorEl.textContent = problema;
+      return;
+    }
+    errorEl.textContent = '';
+    otroInput.value = '';
     if (fotoPreviewUrl) URL.revokeObjectURL(fotoPreviewUrl);
     fotoFile = file;
-    if (file) {
-      fotoPreviewUrl = URL.createObjectURL(file);
-      fotoPreview.src = fotoPreviewUrl;
-      fotoPreview.style.display = '';
-      fotoQuitarBtn.style.display = '';
-    } else {
-      fotoPreviewUrl = null;
-      fotoPreview.style.display = 'none';
-      fotoQuitarBtn.style.display = 'none';
-    }
-  });
+    fotoPreviewUrl = URL.createObjectURL(file);
+    fotoPreview.src = fotoPreviewUrl;
+    fotoPreview.style.display = '';
+    fotoQuitarBtn.style.display = '';
+  }
+
+  document.getElementById('cat-foto-camara-btn').addEventListener('click', () => fotoCamaraInput.click());
+  document.getElementById('cat-foto-galeria-btn').addEventListener('click', () => fotoGaleriaInput.click());
+  fotoCamaraInput.addEventListener('change', () => alElegirFoto(fotoCamaraInput, fotoGaleriaInput));
+  fotoGaleriaInput.addEventListener('change', () => alElegirFoto(fotoGaleriaInput, fotoCamaraInput));
 
   fotoQuitarBtn.addEventListener('click', () => {
     limpiarFoto();
@@ -191,7 +212,7 @@ export async function mountCatastroForm(contenedor, ctx) {
     aplicarEstadoBoton();
 
     try {
-      const creado = await crearEquinoCatastro(campos, establecimientoId, tutorId);
+      const creado = await crearEquinoCatastro(campos, establecimientoId);
       estadoBoton = 'saved';
       aplicarEstadoBoton();
       successEl.textContent = `✓ Guardado — ${creado.numero_identificacion ?? 'sin identificación'}. Podés cargar el próximo caballo.`;
@@ -201,7 +222,12 @@ export async function mountCatastroForm(contenedor, ctx) {
         resetearParaProximoCaballo();
       }, 1500);
     } catch (err) {
-      errorEl.textContent = 'Error al guardar: ' + err.message;
+      // ErrorCatastro ya trae mensaje en español (y el error técnico en
+      // consola); cualquier otra cosa inesperada no se muestra cruda.
+      errorEl.textContent = err?.name === 'ErrorCatastro'
+        ? err.message
+        : 'Ocurrió un error inesperado al guardar. Intentá de nuevo.';
+      if (err?.name !== 'ErrorCatastro') console.error('[Catastro Equino] error inesperado:', err);
       estadoBoton = 'dirty';
       aplicarEstadoBoton();
     }
