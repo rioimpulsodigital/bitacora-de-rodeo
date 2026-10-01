@@ -124,7 +124,8 @@ async function limpiarFotoHuerfana(path) {
 // interviniente no es necesariamente el Tutor del animal, y no se inventa
 // una relación para satisfacer el modelo; se completa después desde la
 // edición normal del Paciente. Requiere que `tutor_responsable_id` admita
-// NULL en la base -- ver verificacion-BIT-50-tutor-null.sql.
+// NULL en la base -- ver animales/migration-BIT-50-tutor-nullable.sql
+// (H-15: Producción lo tenía NOT NULL; decisión de dominio de Bren/KLIAM).
 //
 // `numero_identificacion` es un atributo propio, DISTINTO de `nombre`
 // (revisión estratégica de BIT-50, 30-09-2026): `nombre` es el nombre
