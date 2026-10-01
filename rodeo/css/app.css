@@ -176,3 +176,124 @@
   padding: 14px 16px;
   margin: 8px 0 12px;
 }
+
+/* Ficha mínima de Paciente y listado (BIT-50) */
+.rodeo-table-wrap { overflow-x: auto; }
+.rodeo-celda-principal { color: var(--dark-teal); font-weight: 600; text-decoration: none; }
+.rodeo-celda-principal:hover { text-decoration: underline; }
+.rodeo-celda-secundaria { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.rodeo-table-acciones a + a { margin-left: 12px; }
+.rodeo-ficha-foto { margin-bottom: 16px; }
+.rodeo-ficha-img {
+  display: block; max-width: 100%; max-height: 360px;
+  border-radius: 14px; border: 1px solid var(--border); object-fit: cover;
+}
+.rodeo-ficha-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 4px 20px; }
+.rodeo-ficha-campo { margin-bottom: 12px; font-size: 15px; overflow-wrap: anywhere; }
+.rodeo-ficha-vacio { color: var(--faint); }
+
+/* Catastro Equino (BIT-50) — alta rápida en terreno, mobile-first.
+   Reutiliza .form-field / .salida-btn / .rodeo-card del resto de la app;
+   esto solo agrega lo específico de esta pantalla (aviso de establecimiento,
+   selector de sexo en botones grandes, botones de foto, previsualización). */
+.rodeo-catastro-establecimiento {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.rodeo-catastro-pill-group { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.rodeo-catastro-pill {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 10px;
+  font-size: 14px;
+  cursor: pointer;
+  background: var(--bg);
+  min-width: 100px;
+}
+.rodeo-catastro-pill:has(input:checked) {
+  background: var(--dark-teal);
+  border-color: var(--dark-teal);
+  color: #fff;
+}
+.rodeo-catastro-pill input { position: absolute; opacity: 0; width: 0; height: 0; }
+
+.rodeo-catastro-foto-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.rodeo-catastro-foto-btn {
+  flex: 1 1 140px;
+  font-family: var(--font-body); font-size: 14px; font-weight: 600;
+  background: var(--bg); color: var(--dark-teal);
+  border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px 10px; min-height: 48px; cursor: pointer;
+}
+.rodeo-catastro-foto-btn:hover { background: var(--surface2); }
+.rodeo-catastro-foto-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 260px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  margin-bottom: 8px;
+  object-fit: cover;
+}
+
+/* ============================================================
+   RESPONSIVE del shell (BIT-50, hallazgo H-09).
+   Causa raíz: el sidebar fijo de 190px + padding de 28px del contenido
+   dejaban ~129px útiles a 390px de ancho. En pantallas angostas el
+   sidebar pasa a una franja horizontal de navegación (scroll interno
+   propio, el body nunca scrollea en horizontal) y el contenido toma
+   el ancho completo. Solo CSS: sin cambios de markup ni de JS, y en
+   escritorio (>768px) no cambia nada.
+   ============================================================ */
+@media (max-width: 768px) {
+  .rodeo-header {
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    gap: 8px 12px;
+  }
+  .rodeo-header-establecimiento { order: 3; flex: 1 1 100%; }
+  .rodeo-header-establecimiento select { width: 100%; padding: 10px 14px; font-size: 15px; }
+  .rodeo-header-user { gap: 8px; }
+
+  .rodeo-body-row { flex-direction: column; }
+
+  .rodeo-sidebar {
+    width: auto;
+    flex-direction: row;
+    gap: 4px;
+    padding: 8px 10px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .rodeo-sidebar-item {
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 10px 14px;
+    min-height: 44px;
+    display: flex; align-items: center;
+  }
+
+  .rodeo-content { padding: 16px; min-height: 0; }
+  .rodeo-card { padding: 14px 16px; }
+
+  .rodeo-catastro-form .form-field,
+  .rodeo-catastro-form select.form-field {
+    font-size: 16px; /* evita el zoom automático de iOS Safari en foco */
+    padding: 14px 14px;
+  }
+  .rodeo-catastro-form .form-check-row { min-height: 44px; font-size: 15px; }
+  .rodeo-catastro-pill { padding: 14px 10px; font-size: 15px; min-height: 48px; }
+  .rodeo-catastro-form .salida-btn { padding: 16px; font-size: 16px; }
+}

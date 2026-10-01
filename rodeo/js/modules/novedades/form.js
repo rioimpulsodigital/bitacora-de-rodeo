@@ -1,3 +1,5 @@
+import { escapeHtml } from '../../dashboard.js';
+import { etiquetaPaciente } from '../../services/paciente-label.js';
 import {
   getNovedad,
   listVisitasParaSelector,
@@ -53,7 +55,7 @@ export async function mountNovedadForm(contenedor, ctx, id) {
     const opcionesAnimal = animales
       .map(
         (a) =>
-          `<option value="${a.id}" ${novedad?.animal_id === a.id ? 'selected' : ''}>${a.nombre}</option>`
+          `<option value="${a.id}" ${novedad?.animal_id === a.id ? 'selected' : ''}>${escapeHtml(etiquetaPaciente(a))}</option>`
       )
       .join('');
 

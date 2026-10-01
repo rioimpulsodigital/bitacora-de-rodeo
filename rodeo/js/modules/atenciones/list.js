@@ -1,5 +1,6 @@
 import { listAtenciones } from './services.js';
 import { escapeHtml } from '../../dashboard.js';
+import { etiquetaPaciente } from '../../services/paciente-label.js';
 
 function tieneRol(perfil, rol) {
   return perfil.rol === rol;
@@ -23,8 +24,7 @@ function truncar(s, max = 60) {
 }
 
 function nombreAnimal(a) {
-  if (!a) return '—';
-  return a.nombre ? `${a.nombre} (${a.especie ?? ''})` : (a.especie ?? '—');
+  return etiquetaPaciente(a, { conEspecie: true });
 }
 
 export async function mountAtencionesList(contenedor, ctx) {

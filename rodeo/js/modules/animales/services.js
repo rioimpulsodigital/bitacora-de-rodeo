@@ -76,7 +76,7 @@ export async function actualizarLote(id, campos) {
 export async function listAnimales(establecimientoId) {
   let q = supabase
     .from('animales')
-    .select('id, nombre, especie, personas(nombre)');
+    .select('id, nombre, numero_identificacion, especie, sexo, personas(nombre)');
   if (establecimientoId) q = q.eq('establecimiento_actual_id', establecimientoId);
   const { data, error } = await q.order('created_at', { ascending: false });
   if (error) throw error;
@@ -86,7 +86,7 @@ export async function listAnimales(establecimientoId) {
 export async function getAnimal(id) {
   const { data, error } = await supabase
     .from('animales')
-    .select('id, nombre, especie, tutor_responsable_id, establecimiento_actual_id, fecha_nacimiento, notas, personas(id, nombre, telefono, email)')
+    .select('id, nombre, numero_identificacion, especie, sexo, pelaje, edad_aproximada_anios, foto_path, tutor_responsable_id, establecimiento_actual_id, fecha_nacimiento, notas, personas(id, nombre, telefono, email)')
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;
@@ -99,7 +99,12 @@ export async function crearAnimal(campos) {
     .insert({
       nombre: campos.nombre?.trim() || null,
       especie: campos.especie,
-      tutor_responsable_id: campos.tutor_responsable_id,
+      // Tutor opcional (BIT-50/H-15): NULL = no conocido.
+      tutor_responsable_id: campos.tutor_responsable_id || null,
+      numero_identificacion: campos.numero_identificacion?.trim() || null,
+      sexo: campos.sexo || null,
+      pelaje: campos.pelaje?.trim() || null,
+      edad_aproximada_anios: campos.edad_aproximada_anios ?? null,
       establecimiento_actual_id: campos.establecimiento_actual_id || null,
       fecha_nacimiento: campos.fecha_nacimiento || null,
       notas: campos.notas?.trim() || null,
@@ -116,13 +121,38 @@ export async function actualizarAnimal(id, campos) {
     .update({
       nombre: campos.nombre?.trim() || null,
       especie: campos.especie,
-      tutor_responsable_id: campos.tutor_responsable_id,
+      // Tutor opcional (BIT-50/H-15): NULL = no conocido.
+      tutor_responsable_id: campos.tutor_responsable_id || null,
+      numero_identificacion: campos.numero_identificacion?.trim() || null,
+      sexo: campos.sexo || null,
+      pelaje: campos.pelaje?.trim() || null,
+      edad_aproximada_anios: campos.edad_aproximada_anios ?? null,
       establecimiento_actual_id: campos.establecimiento_actual_id || null,
       fecha_nacimiento: campos.fecha_nacimiento || null,
       notas: campos.notas?.trim() || null,
     })
     .eq('id', id);
   if (error) throw error;
+}
+
+// Foto del Paciente (BIT-50): el bucket 'paciente-fotos' es PRIVADO y la DB
+// guarda solo el path (animales.foto_path). Para mostrarla se pide una
+// signed URL temporal en el momento de abrir la ficha -- nunca se guarda ni
+// se cachea. Devuelve null si no hay foto o si Storage falla: la ficha no
+// debe romperse por la foto.
+const FOTO_URL_TTL_SEGUNDOS = 600;
+export async function getFotoUrlFirmada(fotoPath) {
+  if (!fotoPath) return null;
+  try {
+    const { data, error } = await supabase.storage
+      .from('paciente-fotos')
+      .createSignedUrl(fotoPath, FOTO_URL_TTL_SEGUNDOS);
+    if (error) throw error;
+    return data?.signedUrl ?? null;
+  } catch (e) {
+    console.error('[Paciente] no se pudo firmar la foto:', e);
+    return null;
+  }
 }
 
 // ── Membresía en Lote ────────────────────────────────────────────

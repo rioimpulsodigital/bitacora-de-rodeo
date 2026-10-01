@@ -8,11 +8,13 @@ import {
   getEstablecimientosAccesibles,
   getEstablecimientoActivoId,
   setEstablecimientoActivoId,
+  tieneCatastroEquino,
 } from './services/establecimientos.js';
 import { renderHeaderUsuario, renderHeaderEstablecimiento, renderSinPerfil, mountDashboard } from './dashboard.js';
 import { registerRoute, iniciarRouter, resolverRuta } from './router.js';
 import { registrarRutasJornadas } from './modules/jornadas/index.js';
 import { registrarRutasAnimales } from './modules/animales/index.js';
+import { registrarRutasCatastro } from './modules/catastro/index.js';
 import { registrarRutasVisitas } from './modules/visitas/index.js';
 import { registrarRutasObservaciones } from './modules/observaciones/index.js';
 import { registrarRutasNovedades } from './modules/novedades/index.js';
@@ -55,9 +57,18 @@ async function iniciar() {
     },
   };
 
+  // Catastro Equino (BIT-50): la entrada del menú sigue al establecimiento
+  // ACTIVO, no al usuario. La protección real de la ruta está en el módulo.
+  function actualizarNavCatastro() {
+    const activo = establecimientos.find((e) => e.id === activoId);
+    document.getElementById('rodeo-nav-catastro').style.display = tieneCatastroEquino(activo) ? '' : 'none';
+  }
+  actualizarNavCatastro();
+
   renderHeaderEstablecimiento(establecimientos, activoId, (id) => {
     activoId = id;
     setEstablecimientoActivoId(id);
+    actualizarNavCatastro();
     resolverRuta();
   });
 
@@ -65,6 +76,7 @@ async function iniciar() {
   registerRoute('dashboard', () => mountDashboard(contenedor, ctx));
   registrarRutasJornadas(contenedor, ctx);
   registrarRutasAnimales(contenedor, ctx);
+  registrarRutasCatastro(contenedor, ctx);
   registrarRutasVisitas(contenedor, ctx);
   registrarRutasObservaciones(contenedor, ctx);
   registrarRutasNovedades(contenedor, ctx);

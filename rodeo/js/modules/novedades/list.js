@@ -1,4 +1,6 @@
 import { listNovedades, tipoLabel } from './services.js';
+import { escapeHtml } from '../../dashboard.js';
+import { etiquetaPaciente } from '../../services/paciente-label.js';
 
 function fmt(isoDate) {
   if (!isoDate) return '—';
@@ -25,8 +27,8 @@ export async function mountNovedadesList(contenedor, ctx) {
       const filas = novedades
         .map((n) => {
           const puedeEditar = esAdminOProfesional || n.created_by === ctx.perfil.id;
-          const paciente = n.animales?.nombre
-            ? n.animales.nombre
+          const paciente = n.animales
+            ? escapeHtml(etiquetaPaciente(n.animales))
             : n.lotes?.nombre
             ? `Lote: ${n.lotes.nombre}`
             : '—';
