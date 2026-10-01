@@ -4,6 +4,7 @@
 import { registerRoute } from '../../router.js';
 import { mountAnimalesList } from './list.js';
 import { mountAnimalForm } from './form.js';
+import { mountAnimalDetail } from './detail.js';
 import { mountLotesList } from './lotes-list.js';
 import { mountLoteForm } from './lotes-form.js';
 
@@ -17,6 +18,8 @@ export function registrarRutasAnimales(contenedor, ctx) {
       else mountLotesList(contenedor, ctx);
     } else if (partes[0] === 'nuevo') {
       mountAnimalForm(contenedor, ctx, null);
+    } else if (partes[0] === 'ver') {
+      mountAnimalDetail(contenedor, ctx, partes[1]);
     } else if (partes[0] === 'editar') {
       mountAnimalForm(contenedor, ctx, partes[1]);
     } else {

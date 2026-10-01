@@ -177,6 +177,21 @@
   margin: 8px 0 12px;
 }
 
+/* Ficha mínima de Paciente y listado (BIT-50) */
+.rodeo-table-wrap { overflow-x: auto; }
+.rodeo-celda-principal { color: var(--dark-teal); font-weight: 600; text-decoration: none; }
+.rodeo-celda-principal:hover { text-decoration: underline; }
+.rodeo-celda-secundaria { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.rodeo-table-acciones a + a { margin-left: 12px; }
+.rodeo-ficha-foto { margin-bottom: 16px; }
+.rodeo-ficha-img {
+  display: block; max-width: 100%; max-height: 360px;
+  border-radius: 14px; border: 1px solid var(--border); object-fit: cover;
+}
+.rodeo-ficha-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 4px 20px; }
+.rodeo-ficha-campo { margin-bottom: 12px; font-size: 15px; overflow-wrap: anywhere; }
+.rodeo-ficha-vacio { color: var(--faint); }
+
 /* Catastro Equino (BIT-50) — alta rápida en terreno, mobile-first.
    Reutiliza .form-field / .salida-btn / .rodeo-card del resto de la app;
    esto solo agrega lo específico de esta pantalla (aviso de establecimiento,

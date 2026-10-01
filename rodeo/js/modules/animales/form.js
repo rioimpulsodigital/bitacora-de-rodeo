@@ -3,6 +3,7 @@ import {
   listPersonas, crearPersona,
   listLotes, getLoteActivoDeAnimal, actualizarLoteDeAnimal,
 } from './services.js';
+import { SEXO_OPTS } from './labels.js';
 import { escapeHtml } from '../../dashboard.js';
 
 const ESPECIES = [
@@ -59,6 +60,11 @@ export async function mountAnimalForm(contenedor, ctx, id) {
     (p) => `<option value="${p.id}" ${animal?.tutor_responsable_id === p.id ? 'selected' : ''}>${escapeHtml(p.nombre)}</option>`
   ).join('');
 
+  const sexoOpts = [
+    '<option value="">No informado</option>',
+    ...SEXO_OPTS.map((o) => `<option value="${o.value}" ${animal?.sexo === o.value ? 'selected' : ''}>${o.label}</option>`),
+  ].join('');
+
   const lotesOpts = [
     `<option value="">(Sin lote)</option>`,
     ...lotes.map(
@@ -82,20 +88,33 @@ export async function mountAnimalForm(contenedor, ctx, id) {
         <label class="form-label">Nombre (opcional)</label>
         <input class="form-field" type="text" name="nombre" value="${escapeHtml(animal?.nombre ?? '')}">
 
+        <label class="form-label">Número de identificación (opcional)</label>
+        <input class="form-field" type="text" name="numero_identificacion" value="${escapeHtml(animal?.numero_identificacion ?? '')}" placeholder="Caravana, tatuaje, microchip…" autocomplete="off">
+
+        <label class="form-label">Sexo (opcional)</label>
+        <select class="form-field" name="sexo">${sexoOpts}</select>
+
+        <label class="form-label">Pelaje (opcional)</label>
+        <input class="form-field" type="text" name="pelaje" value="${escapeHtml(animal?.pelaje ?? '')}" autocomplete="off">
+
+        <label class="form-label">Edad aproximada en años (opcional)</label>
+        <input class="form-field" type="number" name="edad_aproximada_anios" min="0" max="60" inputmode="numeric" value="${animal?.edad_aproximada_anios ?? ''}">
+
         <label class="form-label">Fecha de nacimiento (opcional)</label>
         <input class="form-field" type="date" name="fecha_nacimiento" value="${animal?.fecha_nacimiento ?? ''}">
 
         <label class="form-label">Notas</label>
         <textarea class="act-textarea" name="notas" rows="3" style="width:100%;margin-bottom:16px">${animal?.notas ? escapeHtml(animal.notas) : ''}</textarea>
 
-        <label class="form-label">Tutor Responsable <span class="rodeo-required">*</span></label>
+        <label class="form-label">Tutor Responsable (opcional)</label>
         <select class="form-field" name="tutor_responsable_id" id="rodeo-tutor-select"
           ${!hayPersonas ? 'style="display:none"' : ''}>
-          <option value="">Seleccionar tutor…</option>
+          <option value="">No informado</option>
           ${personasOpts}
         </select>
         <button type="button" class="rodeo-link-btn" id="rodeo-tutor-toggle"
           style="margin-top:6px">+ Crear nuevo tutor</button>
+        <p class="rodeo-hint" style="margin-top:6px">Si todavía no se conoce el tutor, dejalo en "No informado".</p>
 
         <div id="rodeo-tutor-inline" class="rodeo-inline-form" style="display:none">
           <p class="rodeo-hint" style="margin:0 0 10px">Nuevo Tutor Responsable</p>
@@ -189,12 +208,19 @@ export async function mountAnimalForm(contenedor, ctx, id) {
       nombre: fd.get('nombre'),
       fecha_nacimiento: fd.get('fecha_nacimiento') || null,
       notas: fd.get('notas'),
-      tutor_responsable_id: fd.get('tutor_responsable_id'),
+      // Opcional (BIT-50/H-15): "No informado" = NULL.
+      tutor_responsable_id: fd.get('tutor_responsable_id') || null,
+      numero_identificacion: fd.get('numero_identificacion'),
+      sexo: fd.get('sexo') || null,
+      pelaje: fd.get('pelaje'),
+      edad_aproximada_anios: fd.get('edad_aproximada_anios') ? parseInt(fd.get('edad_aproximada_anios'), 10) : null,
       establecimiento_actual_id: ctx.establecimientoActivoId,
     };
 
     if (!campos.especie) { errorEl.textContent = 'La especie es obligatoria.'; return; }
-    if (!campos.tutor_responsable_id) { errorEl.textContent = 'El tutor responsable es obligatorio.'; return; }
+    if (campos.edad_aproximada_anios !== null && (Number.isNaN(campos.edad_aproximada_anios) || campos.edad_aproximada_anios < 0 || campos.edad_aproximada_anios > 60)) {
+      errorEl.textContent = 'La edad aproximada debe estar entre 0 y 60 años.'; return;
+    }
 
     const loteId = fd.get('lote_id') || null;
 

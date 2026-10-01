@@ -1,10 +1,6 @@
 import { listAnimales } from './services.js';
+import { LABEL_ESPECIE, tituloPaciente } from './labels.js';
 import { escapeHtml } from '../../dashboard.js';
-
-const LABEL_ESPECIE = {
-  equino: 'Equino', bovino: 'Bovino', ovino: 'Ovino', caprino: 'Caprino',
-  canino: 'Canino', felino: 'Felino', otro: 'Otro',
-};
 
 export async function mountAnimalesList(contenedor, ctx) {
   contenedor.innerHTML = '<p class="rodeo-loading">Cargando pacientes…</p>';
@@ -19,15 +15,27 @@ export async function mountAnimalesList(contenedor, ctx) {
 
   const puedeEditar = ctx.perfil?.rol !== 'OPERADOR_CAMPO';
 
-  const filas = animales.map((a) => `
+  // Un Paciente puede no tener Nombre (Catastro Equino): se muestra el
+  // nombre si existe, o la identificación, y la identificación como dato
+  // secundario cuando hay ambos -- así dos caballos sin nombre se distinguen.
+  const filas = animales.map((a) => {
+    const tieneNombre = !!a.nombre?.trim();
+    const tieneId = !!a.numero_identificacion?.trim();
+    const secundario = tieneNombre && tieneId
+      ? `<div class="rodeo-celda-secundaria">ID: ${escapeHtml(a.numero_identificacion)}</div>`
+      : (!tieneNombre && !tieneId ? '<div class="rodeo-celda-secundaria">Sin identificación visible</div>' : '');
+    const titulo = tieneNombre || tieneId ? escapeHtml(tituloPaciente(a)) : 'Sin nombre';
+    return `
     <tr>
+      <td><a class="rodeo-celda-principal" href="#animales/ver/${a.id}">${titulo}</a>${secundario}</td>
       <td>${escapeHtml(LABEL_ESPECIE[a.especie] ?? a.especie)}</td>
-      <td>${escapeHtml(a.nombre ?? '—')}</td>
       <td>${escapeHtml(a.personas?.nombre ?? '—')}</td>
       <td class="rodeo-table-acciones">
+        <a href="#animales/ver/${a.id}">Ver</a>
         ${puedeEditar ? `<a href="#animales/editar/${a.id}">Editar</a>` : ''}
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 
   contenedor.innerHTML = `
     <div class="rodeo-card">
@@ -40,10 +48,10 @@ export async function mountAnimalesList(contenedor, ctx) {
       </div>
       ${animales.length === 0
         ? '<p>No hay pacientes registrados todavía.</p>'
-        : `<table class="rodeo-table">
-             <thead><tr><th>Especie</th><th>Nombre</th><th>Tutor</th><th></th></tr></thead>
+        : `<div class="rodeo-table-wrap"><table class="rodeo-table">
+             <thead><tr><th>Paciente</th><th>Especie</th><th>Tutor</th><th></th></tr></thead>
              <tbody>${filas}</tbody>
-           </table>`
+           </table></div>`
       }
     </div>`;
 }
