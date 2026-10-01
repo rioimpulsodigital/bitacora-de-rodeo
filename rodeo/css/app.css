@@ -34,6 +34,16 @@
 }
 .rodeo-header-brand img { height: 28px; }
 
+/* BIT-54: acción global para volver al selector de módulos. */
+.rodeo-header-volver {
+  margin-left: 6px;
+  font-family: var(--font-body); font-size: 13px; font-weight: 600;
+  color: #fff; text-decoration: none; white-space: nowrap;
+  background: rgba(255,255,255,0.15);
+  border-radius: 999px; padding: 6px 14px;
+}
+.rodeo-header-volver:hover { background: rgba(255,255,255,0.28); }
+
 .rodeo-header-establecimiento select {
   font-family: var(--font-body);
   border-radius: 999px;
@@ -264,6 +274,7 @@
   .rodeo-header-establecimiento { order: 3; flex: 1 1 100%; }
   .rodeo-header-establecimiento select { width: 100%; padding: 10px 14px; font-size: 15px; }
   .rodeo-header-user { gap: 8px; }
+  .rodeo-header-volver { padding: 10px 14px; min-height: 40px; display: inline-flex; align-items: center; }
 
   .rodeo-body-row { flex-direction: column; }
 
