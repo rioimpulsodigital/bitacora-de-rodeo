@@ -1,5 +1,6 @@
 import { listObservaciones } from './services.js';
 import { escapeHtml } from '../../dashboard.js';
+import { etiquetaPaciente } from '../../services/paciente-label.js';
 
 function formatFecha(str) {
   if (!str) return '—';
@@ -28,7 +29,7 @@ export async function mountObservacionesList(contenedor, ctx) {
       <td>${formatFecha(o.visitas?.fecha)}</td>
       <td>${escapeHtml(o.visitas?.establecimientos?.nombre ?? '—')}</td>
       <td>${escapeHtml(truncar(o.descripcion))}</td>
-      <td>${escapeHtml(o.animales?.nombre ?? '—')}</td>
+      <td>${escapeHtml(o.animales ? etiquetaPaciente(o.animales) : '—')}</td>
       <td class="rodeo-table-acciones">
         <a href="#observaciones/editar/${o.id}">Editar</a>
       </td>

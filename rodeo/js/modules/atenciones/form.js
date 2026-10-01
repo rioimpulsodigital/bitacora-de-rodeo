@@ -9,6 +9,7 @@ import {
   actualizarAtencion,
 } from './services.js';
 import { escapeHtml } from '../../dashboard.js';
+import { etiquetaPaciente } from '../../services/paciente-label.js';
 
 // Una Visita es compatible con un Paciente si es una visita general (sin
 // lote_id, la mayoría de los tipos) o si su lote_id coincide con el lote
@@ -179,7 +180,7 @@ export async function mountAtencionForm(contenedor, ctx, id) {
     const animalesOpts = [
       '<option value="">— Seleccionar paciente —</option>',
       ...animales.map((a) => {
-        const label = a.nombre ? `${a.nombre} (${a.especie ?? ''})` : (a.especie ?? 'Sin identificar');
+        const label = etiquetaPaciente(a, { conEspecie: true });
         return `<option value="${a.id}" ${selectedAnimalId === a.id ? 'selected' : ''}>${escapeHtml(label)}</option>`;
       }),
     ].join('');

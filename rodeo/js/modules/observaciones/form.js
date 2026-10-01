@@ -1,5 +1,6 @@
 import { getObservacion, crearObservacion, actualizarObservacion, listVisitasParaSelector, listAnimalesParaSelector } from './services.js';
 import { escapeHtml } from '../../dashboard.js';
+import { etiquetaPaciente } from '../../services/paciente-label.js';
 
 function formatFecha(str) {
   if (!str) return '—';
@@ -55,7 +56,7 @@ export async function mountObservacionForm(contenedor, ctx, id) {
 
   const animalOpts = [
     `<option value="" ${!animalSeleccionado ? 'selected' : ''}>— Sin sujeto —</option>`,
-    ...animales.map((a) => `<option value="${a.id}" ${animalSeleccionado === a.id ? 'selected' : ''}>${escapeHtml(a.nombre)}</option>`),
+    ...animales.map((a) => `<option value="${a.id}" ${animalSeleccionado === a.id ? 'selected' : ''}>${escapeHtml(etiquetaPaciente(a))}</option>`),
   ].join('');
 
   contenedor.innerHTML = `

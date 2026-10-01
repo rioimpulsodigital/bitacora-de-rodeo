@@ -15,7 +15,7 @@ export const tipoLabel = (t) => TIPOS_LABELS[t] ?? t ?? '—';
 export async function listNovedades(establecimientoId) {
   let q = supabase
     .from('novedades_establecimiento')
-    .select('id, fecha, tipo, descripcion, precipitacion_mm, animal_id, lote_id, created_by, animales(nombre), lotes(nombre)')
+    .select('id, fecha, tipo, descripcion, precipitacion_mm, animal_id, lote_id, created_by, animales(nombre, numero_identificacion, especie), lotes(nombre)')
     .is('deleted_at', null);
   if (establecimientoId) q = q.eq('establecimiento_id', establecimientoId);
   const { data, error } = await q
@@ -28,7 +28,7 @@ export async function listNovedades(establecimientoId) {
 export async function getNovedad(id) {
   const { data, error } = await supabase
     .from('novedades_establecimiento')
-    .select('id, fecha, hora, tipo, descripcion, precipitacion_mm, visita_id, animal_id, lote_id, establecimiento_id, created_by, animales(id, nombre), lotes(id, nombre), visitas(id, fecha, tipo)')
+    .select('id, fecha, hora, tipo, descripcion, precipitacion_mm, visita_id, animal_id, lote_id, establecimiento_id, created_by, animales(id, nombre, numero_identificacion, especie), lotes(id, nombre), visitas(id, fecha, tipo)')
     .eq('id', id)
     .is('deleted_at', null)
     .maybeSingle();
@@ -45,7 +45,7 @@ export async function listVisitasParaSelector(establecimientoId) {
 }
 
 export async function listAnimalesParaSelector(establecimientoId) {
-  let q = supabase.from('animales').select('id, nombre');
+  let q = supabase.from('animales').select('id, nombre, numero_identificacion, especie');
   if (establecimientoId) q = q.eq('establecimiento_actual_id', establecimientoId);
   const { data, error } = await q.order('nombre', { ascending: true });
   if (error) throw error;

@@ -3,7 +3,7 @@ import { supabase } from '../../../../js/core/supabase-client.js';
 export async function listAtenciones(establecimientoId) {
   let q = supabase
     .from('atenciones_clinicas')
-    .select('id, fecha, motivo, diagnostico, estado, proxima_visita, profesional_responsable_id, animales(nombre, especie)');
+    .select('id, fecha, motivo, diagnostico, estado, proxima_visita, profesional_responsable_id, animales(nombre, numero_identificacion, especie)');
   if (establecimientoId) q = q.eq('establecimiento_id', establecimientoId);
   const { data, error } = await q
     .order('fecha', { ascending: false })
@@ -15,7 +15,7 @@ export async function listAtenciones(establecimientoId) {
 export async function getAtencion(id) {
   const { data, error } = await supabase
     .from('atenciones_clinicas')
-    .select('id, establecimiento_id, animal_id, lote_id, visita_id, profesional_responsable_id, fecha, hora, motivo, antecedentes, examen, diagnostico, tratamiento, examenes_estudios, observaciones, estado, proxima_visita, animales(id, nombre, especie), lotes(id, nombre), visitas(id, fecha, tipo), perfiles!profesional_responsable_id(id, nombre)')
+    .select('id, establecimiento_id, animal_id, lote_id, visita_id, profesional_responsable_id, fecha, hora, motivo, antecedentes, examen, diagnostico, tratamiento, examenes_estudios, observaciones, estado, proxima_visita, animales(id, nombre, numero_identificacion, especie), lotes(id, nombre), visitas(id, fecha, tipo), perfiles!profesional_responsable_id(id, nombre)')
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;
@@ -37,7 +37,7 @@ export async function listHistorialAnimal(animalId, establecimientoId, excludeId
 }
 
 export async function listAnimalesParaSelector(establecimientoId) {
-  let q = supabase.from('animales').select('id, nombre, especie');
+  let q = supabase.from('animales').select('id, nombre, numero_identificacion, especie');
   if (establecimientoId) q = q.eq('establecimiento_actual_id', establecimientoId);
   const { data, error } = await q.order('nombre', { ascending: true });
   if (error) throw error;

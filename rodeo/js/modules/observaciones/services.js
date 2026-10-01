@@ -3,7 +3,7 @@ import { supabase } from '../../../../js/core/supabase-client.js';
 export async function listObservaciones(establecimientoId) {
   let q = supabase
     .from('observaciones_campo')
-    .select('id, descripcion, sujeto_tipo, animal_id, visita_id, visitas!inner(fecha, establecimiento_id, establecimientos(nombre)), animales(nombre)');
+    .select('id, descripcion, sujeto_tipo, animal_id, visita_id, visitas!inner(fecha, establecimiento_id, establecimientos(nombre)), animales(nombre, numero_identificacion, especie)');
   if (establecimientoId) q = q.eq('visitas.establecimiento_id', establecimientoId);
   const { data, error } = await q.order('created_at', { ascending: false });
   if (error) throw error;
@@ -13,7 +13,7 @@ export async function listObservaciones(establecimientoId) {
 export async function getObservacion(id) {
   const { data, error } = await supabase
     .from('observaciones_campo')
-    .select('id, descripcion, sujeto_tipo, animal_id, lote_id, visita_id, visitas(id, fecha, tipo, estado, establecimiento_id), animales(id, nombre)')
+    .select('id, descripcion, sujeto_tipo, animal_id, lote_id, visita_id, visitas(id, fecha, tipo, estado, establecimiento_id), animales(id, nombre, numero_identificacion, especie)')
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;
@@ -33,7 +33,7 @@ export async function listVisitasParaSelector(establecimientoId) {
 export async function listAnimalesParaSelector(establecimientoId) {
   let q = supabase
     .from('animales')
-    .select('id, nombre');
+    .select('id, nombre, numero_identificacion, especie');
   if (establecimientoId) q = q.eq('establecimiento_actual_id', establecimientoId);
   const { data, error } = await q.order('nombre', { ascending: true });
   if (error) throw error;
