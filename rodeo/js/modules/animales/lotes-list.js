@@ -17,7 +17,6 @@ export async function mountLotesList(contenedor, ctx) {
       <td>${escapeHtml(l.nombre)}</td>
       <td>${escapeHtml(l.notas ?? '—')}</td>
       <td class="rodeo-table-acciones">
-        <a href="#animales/lotes/ver/${l.id}">Ver</a>
         <a href="#animales/lotes/editar/${l.id}">Editar</a>
       </td>
     </tr>`).join('');
