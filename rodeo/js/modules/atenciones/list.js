@@ -86,7 +86,10 @@ export async function mountAtencionesList(contenedor, ctx) {
             <td>${escapeHtml(truncar(a.diagnostico))}</td>
             <td>${estadoHtml}</td>
             <td>${a.proxima_visita ? fmt(a.proxima_visita) : '—'}</td>
-            <td class="rodeo-table-acciones">${puedeEditar ? `<a href="#atenciones/editar/${a.id}">Editar</a>` : ''}</td>
+            <td class="rodeo-table-acciones">
+              <a href="#atenciones/ver/${a.id}">Ver</a>
+              ${puedeEditar ? ` <a href="#atenciones/editar/${a.id}">Editar</a>` : ''}
+            </td>
           </tr>`;
         })
         .join('');

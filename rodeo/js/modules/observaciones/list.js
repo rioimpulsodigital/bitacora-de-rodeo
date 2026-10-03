@@ -31,6 +31,7 @@ export async function mountObservacionesList(contenedor, ctx) {
       <td>${escapeHtml(truncar(o.descripcion))}</td>
       <td>${escapeHtml(o.animales ? etiquetaPaciente(o.animales) : '—')}</td>
       <td class="rodeo-table-acciones">
+        <a href="#observaciones/ver/${o.id}">Ver</a>
         <a href="#observaciones/editar/${o.id}">Editar</a>
       </td>
     </tr>`).join('');

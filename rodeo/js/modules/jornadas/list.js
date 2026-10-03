@@ -29,7 +29,8 @@ export async function mountJornadasList(contenedor, ctx) {
           <td>${fmtHora(j.hora_salida)}</td>
           <td>${escapeHtml(j.perfiles?.nombre ?? '—')}</td>
           <td class="rodeo-table-acciones">
-            <a href="#jornadas/editar/${j.id}">${esPropia ? 'Editar' : 'Ver'}</a>
+            <a href="#jornadas/ver/${j.id}">Ver</a>
+            ${esPropia ? `<a href="#jornadas/editar/${j.id}">Editar</a>` : ''}
             ${puedeEnviarAPapelera ? `<button type="button" class="rodeo-link-btn rodeo-jornada-papelera" data-id="${j.id}">Enviar a la Papelera</button>` : ''}
           </td>
         </tr>`;

@@ -41,6 +41,7 @@ export async function mountVisitasList(contenedor, ctx) {
       <td>${v.hora_fin ? v.hora_fin.slice(0, 5) : '—'}</td>
       <td>${BADGE_ESTADO[v.estado] ?? escapeHtml(v.estado)}</td>
       <td class="rodeo-table-acciones">
+        <a href="#visitas/ver/${v.id}">Ver</a>
         <a href="#visitas/editar/${v.id}">Editar</a>
       </td>
     </tr>`).join('');
