@@ -43,7 +43,7 @@ export async function mountObservacionesList(contenedor, ctx) {
         <a class="rodeo-btn" href="#observaciones/nueva">+ Nueva Observación</a>
       </div>
       ${observaciones.length === 0
-        ? '<p>No hay observaciones registradas todavía. <a href="#observaciones/nueva">+ Nueva Observación</a></p>'
+        ? '<p>No hay observaciones registradas todavía.</p>'
         : `<table class="rodeo-table">
              <thead><tr><th>Fecha visita</th><th>Establecimiento</th><th>Descripción</th><th>Paciente Animal</th><th></th></tr></thead>
              <tbody>${filas}</tbody>
