@@ -10,6 +10,10 @@ import { mountLoteForm } from './lotes-form.js';
 
 // Lotes vive bajo #animales/lotes/... para que el ítem "Pacientes" del
 // sidebar permanezca activo al navegar dentro del módulo.
+// Sin vista `Ver` propia a propósito (BIT-57): el listado ya muestra el
+// 100% de los datos de Lote (nombre, notas) sin truncar -- una ficha de
+// detalle no agregaría valor funcional. Si Lotes incorpora más datos en
+// el futuro, recién ahí se evalúa agregarla.
 export function registrarRutasAnimales(contenedor, ctx) {
   registerRoute('animales', (partes) => {
     if (partes[0] === 'lotes') {

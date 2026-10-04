@@ -41,7 +41,10 @@ export async function mountNovedadesList(contenedor, ctx) {
             <td>${tipoLabel(n.tipo)}${lluviaHtml}</td>
             <td>${truncar(n.descripcion)}</td>
             <td>${paciente}</td>
-            <td class="rodeo-table-acciones">${puedeEditar ? `<a href="#novedades/editar/${n.id}">Editar</a>` : ''}</td>
+            <td class="rodeo-table-acciones">
+              <a href="#novedades/ver/${n.id}">Ver</a>
+              ${puedeEditar ? ` <a href="#novedades/editar/${n.id}">Editar</a>` : ''}
+            </td>
           </tr>`;
         })
         .join('');

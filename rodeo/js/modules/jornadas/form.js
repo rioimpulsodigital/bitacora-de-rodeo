@@ -1,7 +1,7 @@
 import { getJornada, crearJornada, actualizarJornada } from '../../services/jornadas.js';
 import { escapeHtml } from '../../dashboard.js';
 
-export async function mountJornadaForm(contenedor, ctx, id) {
+export async function mountJornadaForm(contenedor, ctx, id, { soloLecturaForzada = false } = {}) {
   let jornada = null;
 
   if (id) {
@@ -19,16 +19,22 @@ export async function mountJornadaForm(contenedor, ctx, id) {
   }
 
   // jornadas_update en BIT-04 es estrictamente auth.uid() = profesional_id,
-  // sin excepción para Administrador — si no es propia, se muestra de solo
-  // lectura en vez de ofrecer un botón que Supabase va a rechazar.
-  const soloLectura = jornada && jornada.profesional_id !== ctx.perfil.id;
+  // sin excepción para Administrador — si no es propia, SIEMPRE de solo
+  // lectura (si no, Supabase rechazaría el guardado). `soloLecturaForzada`
+  // es la vía explícita "Ver" (BIT-57): deja consultar la propia Jornada
+  // sin entrar a edición, sin tocar el permiso real de escritura.
+  const esPropia = jornada && jornada.profesional_id === ctx.perfil.id;
+  const soloLectura = soloLecturaForzada || (jornada && !esPropia);
   const hoy = new Date().toISOString().slice(0, 10);
   const disabled = soloLectura ? 'disabled' : '';
 
   contenedor.innerHTML = `
     <div class="rodeo-card">
-      <h2>${jornada ? (soloLectura ? 'Detalle de jornada' : 'Editar jornada') : 'Nueva jornada'}</h2>
-      ${soloLectura ? '<p class="rodeo-hint">Esta jornada pertenece a otra persona — solo lectura.</p>' : ''}
+      <div class="rodeo-card-header">
+        <h2>${jornada ? (soloLectura ? 'Detalle de jornada' : 'Editar jornada') : 'Nueva jornada'}</h2>
+        ${soloLectura && esPropia ? `<a class="rodeo-btn" href="#jornadas/editar/${jornada.id}">Editar</a>` : ''}
+      </div>
+      ${soloLectura && jornada && !esPropia ? '<p class="rodeo-hint">Esta jornada pertenece a otra persona — solo lectura.</p>' : ''}
       <form id="rodeo-jornada-form">
         <label class="form-label">Fecha</label>
         <input class="form-field" type="date" name="fecha" value="${jornada?.fecha ?? hoy}" ${disabled} required>

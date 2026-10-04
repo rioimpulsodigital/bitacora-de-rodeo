@@ -10,6 +10,7 @@ import { mountJornadaForm } from './form.js';
 export function registrarRutasJornadas(contenedor, ctx) {
   registerRoute('jornadas', (partes) => {
     if (partes[0] === 'nueva') mountJornadaForm(contenedor, ctx, null);
+    else if (partes[0] === 'ver') mountJornadaForm(contenedor, ctx, partes[1], { soloLecturaForzada: true });
     else if (partes[0] === 'editar') mountJornadaForm(contenedor, ctx, partes[1]);
     else mountJornadasList(contenedor, ctx);
   });
