@@ -18,6 +18,29 @@ export async function listJornadas() {
   return data;
 }
 
+// BIT-61: Jornada activa = la más reciente del propio profesional, sin
+// hora_salida y sin enviar a la Papelera. Se filtra SIEMPRE por
+// profesional_id explícito (no alcanza con dejarlo a la policy): un
+// ADMINISTRADOR puede ver jornadas ajenas por RLS, pero acá necesitamos
+// específicamente "la jornada activa de QUIEN está mirando la pantalla",
+// nunca la de otra persona. No existe columna de estado -- "activa" se
+// deriva de hora_salida IS NULL, igual que en el resto del módulo.
+export async function getJornadaActivaPropia(profesionalId) {
+  const { data, error } = await supabase
+    .from('jornadas')
+    .select('id, fecha, hora_llegada, hora_salida, notas, profesional_id')
+    .eq('profesional_id', profesionalId)
+    .is('hora_salida', null)
+    .is('deleted_at', null)
+    .order('fecha', { ascending: false })
+    .order('hora_llegada', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function getJornada(id) {
   const { data, error } = await supabase
     .from('jornadas')

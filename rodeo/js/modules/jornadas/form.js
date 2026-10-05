@@ -52,7 +52,7 @@ export async function mountJornadaForm(contenedor, ctx, id, { soloLecturaForzada
 
         <div class="rodeo-form-acciones">
           ${soloLectura ? '' : `<button type="submit" class="salida-btn">Guardar</button>`}
-          <a href="#jornadas" class="rodeo-link-btn">Volver al listado</a>
+          <a href="#jornadas/historial" class="rodeo-link-btn">Volver al listado</a>
         </div>
       </form>
     </div>
@@ -81,7 +81,7 @@ export async function mountJornadaForm(contenedor, ctx, id, { soloLecturaForzada
     try {
       if (jornada) await actualizarJornada(jornada.id, campos);
       else await crearJornada(campos, ctx.perfil.id);
-      location.hash = '#jornadas';
+      location.hash = '#jornadas/historial';
     } catch (err) {
       errorEl.textContent = 'Error al guardar: ' + err.message;
     }
