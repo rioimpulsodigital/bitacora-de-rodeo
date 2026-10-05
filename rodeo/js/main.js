@@ -104,4 +104,68 @@ document.getElementById('rodeo-volver-modulos').addEventListener('click', () => 
   try { localStorage.removeItem(CLAVE_MODULO_ACTIVO_PORTAL); } catch { /* storage bloqueado: igual navega */ }
 });
 
+// BIT-58: menú móvil ☰. Reutiliza el mismo <nav id="rodeo-sidebar"> del
+// sidebar de escritorio (misma fuente de verdad de navegación, mismo
+// toggle de visibilidad por rol/capacidad que ya aplica más arriba
+// -- Catastro/Papelera -- sin ninguna lista paralela). A ≤768px ese
+// <nav> pasa a ser un panel desplegable oculto por defecto (ver
+// app.css); acá solo se togglea la clase que lo muestra/oculta.
+const menuToggle = document.getElementById('rodeo-menu-toggle');
+const sidebarNav = document.getElementById('rodeo-sidebar');
+const volverLink = document.getElementById('rodeo-volver-modulos');
+const brandEl = document.querySelector('.rodeo-header-brand');
+
+function cerrarMenuMovil() {
+  sidebarNav.classList.remove('rodeo-sidebar-open');
+  menuToggle.setAttribute('aria-expanded', 'false');
+  menuToggle.setAttribute('aria-label', 'Abrir navegación');
+}
+
+function abrirMenuMovil() {
+  sidebarNav.classList.add('rodeo-sidebar-open');
+  menuToggle.setAttribute('aria-expanded', 'true');
+  menuToggle.setAttribute('aria-label', 'Cerrar navegación');
+}
+
+menuToggle.addEventListener('click', () => {
+  if (sidebarNav.classList.contains('rodeo-sidebar-open')) cerrarMenuMovil();
+  else abrirMenuMovil();
+});
+
+// Cerrar al elegir un módulo (o "Volver a módulos", ver más abajo) --
+// delegado sobre el contenedor, sin enganchar cada link uno por uno ni
+// duplicar nada si mañana se agrega/saca un módulo del <nav>.
+sidebarNav.addEventListener('click', (e) => {
+  if (e.target.closest('.rodeo-sidebar-item, .rodeo-sidebar-item-volver')) cerrarMenuMovil();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') cerrarMenuMovil();
+});
+
+// Cerrar al tocar fuera del panel y del botón que lo abre.
+document.addEventListener('click', (e) => {
+  if (!sidebarNav.classList.contains('rodeo-sidebar-open')) return;
+  if (sidebarNav.contains(e.target) || menuToggle.contains(e.target)) return;
+  cerrarMenuMovil();
+});
+
+// "Volver a módulos" (BIT-54) vive en el header en escritorio; en móvil
+// el header queda saturado si además suma el ☰, así que ese MISMO <a>
+// (nunca un duplicado) se reubica dentro del panel de navegación. Se
+// mueve el nodo real -- conserva el listener ya enganchado arriba.
+const mqMobile = window.matchMedia('(max-width: 768px)');
+function ubicarVolver(esMobile) {
+  cerrarMenuMovil();
+  if (esMobile) {
+    volverLink.classList.add('rodeo-sidebar-item-volver');
+    sidebarNav.appendChild(volverLink);
+  } else {
+    volverLink.classList.remove('rodeo-sidebar-item-volver');
+    brandEl.appendChild(volverLink);
+  }
+}
+ubicarVolver(mqMobile.matches);
+mqMobile.addEventListener('change', (e) => ubicarVolver(e.matches));
+
 iniciar();
