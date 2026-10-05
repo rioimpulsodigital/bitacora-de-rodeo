@@ -17,8 +17,16 @@
 // bajo el establecimiento recién cambiado mientras la Jornada de otro
 // establecimiento sigue abierta -- ver limitación documentada en el
 // informe de BIT-61.
+//
+// Capacidad (tercera ronda de BIT-61): Jornada no es global -- se habilita
+// por Usuario × Establecimiento en `establecimientos_usuarios.jornada_
+// habilitada` (migration-BIT-61-capacidad-jornada.sql, preparada, NO
+// aplicada). Gatea únicamente ABRIR una Jornada nueva; una ya activa
+// siempre se puede seguir viendo/cerrando aunque la capacidad se revoque
+// después de abierta (ver renderSinActiva/renderActiva).
 
 import { getJornadaActivaPropia, crearJornada, actualizarJornada } from '../../services/jornadas.js';
+import { tieneJornadaHabilitada } from '../../services/establecimientos.js';
 import { escapeHtml } from '../../dashboard.js';
 
 function nowParts() {
@@ -101,6 +109,22 @@ export async function mountJornadaOperativa(contenedor, ctx) {
       contenedor.innerHTML = `
         <div class="rodeo-card">
           <p class="rodeo-error">No hay un establecimiento activo. Elegí un establecimiento arriba antes de iniciar la jornada.</p>
+        </div>`;
+      return;
+    }
+
+    // Protección real de la ruta (BIT-61): ocultar el menú no alcanza,
+    // #jornadas puede escribirse a mano o quedar abierto al cambiar de
+    // establecimiento -- mismo criterio ya usado por Catastro Equino
+    // (modules/catastro/form.js). Solo gatea abrir una Jornada NUEVA: una
+    // ya activa (ver renderActiva) siempre se puede seguir viendo/cerrando
+    // aunque la capacidad se revoque después de abierta.
+    if (!tieneJornadaHabilitada(ctx.establecimientoActivoId, ctx.capacidadesJornada, ctx.perfil)) {
+      contenedor.innerHTML = `
+        <div class="rodeo-card">
+          <h2>🕒 Jornada</h2>
+          <p class="rodeo-error">Jornada no está disponible para vos en <strong>${escapeHtml(nombreEstablecimientoActivo)}</strong>. Elegí otro establecimiento arriba, o consultá con un ADMINISTRADOR si corresponde habilitarla acá.</p>
+          <a href="#jornadas/historial" class="rodeo-link-btn" style="margin-left:0">Ver historial de jornadas</a>
         </div>`;
       return;
     }

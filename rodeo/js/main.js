@@ -9,6 +9,8 @@ import {
   getEstablecimientoActivoId,
   setEstablecimientoActivoId,
   tieneCatastroEquino,
+  getCapacidadesJornada,
+  tieneJornadaHabilitada,
 } from './services/establecimientos.js';
 import { renderHeaderUsuario, renderHeaderEstablecimiento, renderSinPerfil, mountDashboard } from './dashboard.js';
 import { registerRoute, iniciarRouter, resolverRuta } from './router.js';
@@ -40,6 +42,12 @@ async function iniciar() {
     return;
   }
 
+  // BIT-61: capacidad Jornada por Usuario × Establecimiento. Depende de
+  // perfil.id, así que se pide después del Promise.all de arriba. Es
+  // transitorio (ver migration-BIT-61-capacidad-jornada.sql) -- BIT-56
+  // reemplazará esto por el modelo genérico de capacidades.
+  const capacidadesJornada = await getCapacidadesJornada(perfil.id);
+
   renderHeaderUsuario(perfil, handleSignOut);
   let activoId = getEstablecimientoActivoId();
   if (!activoId || !establecimientos.some((e) => e.id === activoId)) {
@@ -52,6 +60,7 @@ async function iniciar() {
   const ctx = {
     perfil,
     establecimientos,
+    capacidadesJornada,
     get establecimientoActivoId() {
       return activoId;
     },
@@ -65,10 +74,21 @@ async function iniciar() {
   }
   actualizarNavCatastro();
 
+  // Jornada (BIT-61): a diferencia de Catastro, depende también de QUIÉN
+  // mira -- mismo establecimiento activo, pero el mapa ya viene scopeado al
+  // usuario actual (getCapacidadesJornada). La protección real de la ruta
+  // está en el módulo (operativa.js), igual que Catastro.
+  function actualizarNavJornadas() {
+    document.getElementById('rodeo-nav-jornadas').style.display =
+      tieneJornadaHabilitada(activoId, capacidadesJornada, perfil) ? '' : 'none';
+  }
+  actualizarNavJornadas();
+
   renderHeaderEstablecimiento(establecimientos, activoId, (id) => {
     activoId = id;
     setEstablecimientoActivoId(id);
     actualizarNavCatastro();
+    actualizarNavJornadas();
     resolverRuta();
   });
 
