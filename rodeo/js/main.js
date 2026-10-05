@@ -91,4 +91,17 @@ async function iniciar() {
   iniciarRouter('dashboard');
 }
 
+// BIT-54: "← Volver a módulos" -- vuelve al selector general (portada del
+// portal en la raíz, ../index.html). La sesión no se toca: es la misma
+// sesión de Supabase en el mismo origen, así que no pide login de nuevo.
+// El portal, al arrancar, reabre el ÚLTIMO módulo guardado en localStorage
+// (js/core/app.js, boot()); para que aterrice en la portada y no en ese
+// módulo se borra esa clave antes de navegar -- mismo efecto que
+// App.backToPortada(). Misma clave que STORAGE_KEY de js/core/app.js
+// (no se importa de ahí para no acoplar rodeo/ al núcleo del legacy).
+const CLAVE_MODULO_ACTIVO_PORTAL = 'bitacora_modulo';
+document.getElementById('rodeo-volver-modulos').addEventListener('click', () => {
+  try { localStorage.removeItem(CLAVE_MODULO_ACTIVO_PORTAL); } catch { /* storage bloqueado: igual navega */ }
+});
+
 iniciar();
