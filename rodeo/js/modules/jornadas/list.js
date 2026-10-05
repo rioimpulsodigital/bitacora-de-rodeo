@@ -25,6 +25,7 @@ export async function mountJornadasList(contenedor, ctx) {
       return `
         <tr>
           <td>${escapeHtml(j.fecha)}</td>
+          <td>${escapeHtml(j.establecimientos?.nombre ?? '—')}</td>
           <td>${fmtHora(j.hora_llegada)}</td>
           <td>${fmtHora(j.hora_salida)}</td>
           <td>${escapeHtml(j.perfiles?.nombre ?? '—')}</td>
@@ -53,7 +54,7 @@ export async function mountJornadasList(contenedor, ctx) {
         jornadas.length === 0
           ? '<p>No hay jornadas registradas todavía.</p>'
           : `<table class="rodeo-table">
-               <thead><tr><th>Fecha</th><th>Llegada</th><th>Salida</th><th>Profesional</th><th></th></tr></thead>
+               <thead><tr><th>Fecha</th><th>Establecimiento</th><th>Llegada</th><th>Salida</th><th>Profesional</th><th></th></tr></thead>
                <tbody>${filas}</tbody>
              </table>`
       }

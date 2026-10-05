@@ -1,17 +1,22 @@
 // Pantalla operativa de Jornada (BIT-61) — reemplaza el listado/CRUD
 // genérico como experiencia PRINCIPAL de #jornadas. Flujo: LLEGADA →
-// Jornada activa → SALIDA, usando exclusivamente las columnas que ya
-// existen en `jornadas` (profesional_id, fecha, hora_llegada, hora_salida,
-// notas) -- sin tocar schema. El listado histórico (con Ver/Editar de
-// BIT-57 y "Enviar a la Papelera") sigue existiendo tal cual en
+// Jornada activa → SALIDA. El listado histórico (con Ver/Editar de BIT-57
+// y "Enviar a la Papelera") sigue existiendo tal cual en
 // #jornadas/historial, no se tocó ni se eliminó.
 //
-// Establecimiento: la tabla `jornadas` NO tiene columna establecimiento_id
-// (es una entidad puramente personal, confirmado en services/jornadas.js
-// desde BIT-04). Esta pantalla MUESTRA el establecimiento activo global
-// como contexto informativo, pero no lo persiste en la fila -- ver
-// hallazgo reportado en el informe de BIT-61. No inventar una relación
-// que el modelo real no tiene.
+// Establecimiento (corrección de regla de dominio, segunda ronda de
+// BIT-61): una Jornada pertenece a UN único establecimiento -- el que
+// estaba activo al presionar LLEGADA. Se persiste en
+// `jornadas.establecimiento_id` (migration-BIT-61-establecimiento-jornada.sql,
+// preparada, NO aplicada todavía) y es INMUTABLE después de creada: si la
+// usuaria cambia el selector global de establecimiento mientras tiene una
+// Jornada activa, esta pantalla sigue mostrando y operando sobre el
+// establecimiento con el que la Jornada se abrió, nunca el nuevo. Lo que
+// NO resuelve esta pantalla (deliberadamente, para no ampliar alcance):
+// impedir que OTROS módulos (Visitas, Atenciones, etc.) registren algo
+// bajo el establecimiento recién cambiado mientras la Jornada de otro
+// establecimiento sigue abierta -- ver limitación documentada en el
+// informe de BIT-61.
 
 import { getJornadaActivaPropia, crearJornada, actualizarJornada } from '../../services/jornadas.js';
 import { escapeHtml } from '../../dashboard.js';
@@ -59,8 +64,8 @@ export async function mountJornadaOperativa(contenedor, ctx) {
     return;
   }
 
-  const establecimiento = ctx.establecimientos.find((est) => est.id === ctx.establecimientoActivoId);
-  const nombreEstablecimiento = establecimiento?.nombre ?? '—';
+  const establecimientoActivoGlobal = ctx.establecimientos.find((est) => est.id === ctx.establecimientoActivoId);
+  const nombreEstablecimientoActivo = establecimientoActivoGlobal?.nombre ?? '—';
 
   let intervaloReloj = null;
   let intervaloDuracion = null;
@@ -89,15 +94,26 @@ export async function mountJornadaOperativa(contenedor, ctx) {
 
   function renderSinActiva() {
     limpiarIntervalos();
+
+    // Sin establecimiento activo no hay dónde registrar LLEGADA -- mismo
+    // criterio que ya usa modules/catastro/form.js para este mismo caso.
+    if (!ctx.establecimientoActivoId || !establecimientoActivoGlobal) {
+      contenedor.innerHTML = `
+        <div class="rodeo-card">
+          <p class="rodeo-error">No hay un establecimiento activo. Elegí un establecimiento arriba antes de iniciar la jornada.</p>
+        </div>`;
+      return;
+    }
+
     contenedor.innerHTML = `
       <div class="rodeo-card rodeo-jornada-operativa">
         <h2>Registro de Jornada</h2>
         <p class="rodeo-jornada-fecha">${fmtFecha(nowParts().fecha)}</p>
-        <p class="rodeo-jornada-establecimiento">📍 ${escapeHtml(nombreEstablecimiento)}</p>
+        <p class="rodeo-jornada-establecimiento">📍 ${escapeHtml(nombreEstablecimientoActivo)}</p>
         <p class="rodeo-jornada-reloj" id="jornada-reloj"></p>
         <div id="jornada-error" class="rodeo-error"></div>
         <button type="button" class="salida-btn rodeo-jornada-btn rodeo-jornada-btn-llegada" id="btn-llegada">LLEGADA</button>
-        <p class="rodeo-hint" style="text-align:center;margin:10px 0 16px">Presioná para iniciar la jornada</p>
+        <p class="rodeo-hint" style="text-align:center;margin:10px 0 16px">Presioná para iniciar la jornada en ${escapeHtml(nombreEstablecimientoActivo)}</p>
         <a href="#jornadas/historial" class="rodeo-link-btn" style="margin-left:0">Ver historial de jornadas</a>
       </div>`;
 
@@ -112,7 +128,10 @@ export async function mountJornadaOperativa(contenedor, ctx) {
       errorEl.textContent = '';
       const { fecha, hora } = nowParts();
       try {
-        await crearJornada({ fecha, hora_llegada: hora, hora_salida: null, notas: null }, ctx.perfil.id);
+        await crearJornada(
+          { fecha, hora_llegada: hora, hora_salida: null, notas: null, establecimiento_id: ctx.establecimientoActivoId },
+          ctx.perfil.id
+        );
         jornadaActiva = await getJornadaActivaPropia(ctx.perfil.id);
         if (!jornadaActiva) throw new Error('La jornada se creó pero no se pudo recuperar. Recargá la página.');
         renderActiva();
@@ -126,11 +145,27 @@ export async function mountJornadaOperativa(contenedor, ctx) {
 
   function renderActiva() {
     limpiarIntervalos();
+
+    const nombreEstablecimientoJornada = jornadaActiva.establecimientos?.nombre ?? '—';
+    // La Jornada ya quedó asociada a un establecimiento al crearse -- esta
+    // pantalla SIEMPRE opera sobre ESE, nunca sobre el que esté
+    // seleccionado ahora en el header, aunque hayan cambiado mientras
+    // tanto. Si difieren, se avisa -- no se mezcla ni se corrige solo.
+    const cambioDeEstablecimiento =
+      jornadaActiva.establecimiento_id && ctx.establecimientoActivoId &&
+      jornadaActiva.establecimiento_id !== ctx.establecimientoActivoId;
+
     contenedor.innerHTML = `
       <div class="rodeo-card rodeo-jornada-operativa">
         <h2>Jornada en curso</h2>
         <p class="rodeo-jornada-fecha">${fmtFecha(jornadaActiva.fecha)}</p>
-        <p class="rodeo-jornada-establecimiento">📍 ${escapeHtml(nombreEstablecimiento)}</p>
+        <p class="rodeo-jornada-establecimiento">📍 Jornada activa en <strong>${escapeHtml(nombreEstablecimientoJornada)}</strong></p>
+        ${cambioDeEstablecimiento ? `
+        <div class="rodeo-jornada-aviso">
+          ⚠️ El establecimiento seleccionado arriba ahora es <strong>${escapeHtml(nombreEstablecimientoActivo)}</strong>.
+          Esta Jornada sigue perteneciendo a ${escapeHtml(nombreEstablecimientoJornada)} -- no se mezcla.
+          Si vas a trabajar en ${escapeHtml(nombreEstablecimientoActivo)}, cerrá esta Jornada primero e iniciá una nueva ahí.
+        </div>` : ''}
         <p class="rodeo-jornada-dato">Llegada: <strong>${fmtHora(jornadaActiva.hora_llegada)}</strong></p>
         <p class="rodeo-jornada-duracion" id="jornada-duracion"></p>
         <div id="jornada-error" class="rodeo-error"></div>
@@ -155,7 +190,7 @@ export async function mountJornadaOperativa(contenedor, ctx) {
           hora_salida: hora,
           notas: jornadaActiva.notas,
         });
-        renderResumen(hora);
+        renderResumen(hora, nombreEstablecimientoJornada);
       } catch (err) {
         errorEl.textContent = 'Error al registrar la salida: ' + err.message;
         btn.disabled = false;
@@ -164,12 +199,13 @@ export async function mountJornadaOperativa(contenedor, ctx) {
     });
   }
 
-  function renderResumen(horaSalida) {
+  function renderResumen(horaSalida, nombreEstablecimientoJornada) {
     limpiarIntervalos();
     contenedor.innerHTML = `
       <div class="rodeo-card rodeo-jornada-operativa">
         <h2>✓ Jornada cerrada</h2>
         <p class="rodeo-jornada-fecha">${fmtFecha(jornadaActiva.fecha)}</p>
+        <p class="rodeo-jornada-establecimiento">📍 ${escapeHtml(nombreEstablecimientoJornada)}</p>
         <p class="rodeo-jornada-dato">Llegada: <strong>${fmtHora(jornadaActiva.hora_llegada)}</strong></p>
         <p class="rodeo-jornada-dato">Salida: <strong>${fmtHora(horaSalida)}</strong></p>
         <a href="#jornadas/historial" class="rodeo-link-btn" style="margin-left:0">Ver historial de jornadas</a>

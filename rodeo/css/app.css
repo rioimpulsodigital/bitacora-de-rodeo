@@ -292,6 +292,11 @@
 .rodeo-jornada-duracion { font-size: 13px; color: var(--muted); margin: 0 0 20px; }
 .rodeo-jornada-btn { font-size: 20px; letter-spacing: 0.04em; padding: 20px; }
 .rodeo-jornada-btn-salida { background: linear-gradient(135deg, var(--orange), #d9540a); }
+.rodeo-jornada-aviso {
+  background: #fff3cd; border: 1px solid #e0c674; color: #6b5410;
+  border-radius: 12px; padding: 10px 14px; font-size: 13px;
+  margin: 0 0 16px; text-align: left;
+}
 
 /* ============================================================
    RESPONSIVE del shell (BIT-50 hallazgo H-09 -- base; BIT-58
