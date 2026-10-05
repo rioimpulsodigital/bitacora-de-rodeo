@@ -44,6 +44,21 @@
 }
 .rodeo-header-volver:hover { background: rgba(255,255,255,0.28); }
 
+/* BIT-58: botón de navegación móvil -- oculto en escritorio por defecto;
+   @media (max-width: 768px) más abajo lo muestra y oculta la barra
+   horizontal de módulos que usaba ese mismo espacio hasta BIT-57. */
+.rodeo-menu-toggle {
+  display: none;
+  align-items: center; justify-content: center;
+  width: 44px; height: 44px;
+  background: rgba(255,255,255,0.15);
+  border: none; border-radius: 12px;
+  color: #fff; font-size: 20px; line-height: 1;
+  cursor: pointer;
+}
+.rodeo-menu-toggle:hover { background: rgba(255,255,255,0.28); }
+.rodeo-menu-toggle:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
 .rodeo-header-establecimiento select {
   font-family: var(--font-body);
   border-radius: 999px;
@@ -257,13 +272,12 @@
 }
 
 /* ============================================================
-   RESPONSIVE del shell (BIT-50, hallazgo H-09).
+   RESPONSIVE del shell (BIT-50 hallazgo H-09 -- base; BIT-58
+   reemplaza la franja horizontal de módulos por un menú ☰).
    Causa raíz: el sidebar fijo de 190px + padding de 28px del contenido
-   dejaban ~129px útiles a 390px de ancho. En pantallas angostas el
-   sidebar pasa a una franja horizontal de navegación (scroll interno
-   propio, el body nunca scrollea en horizontal) y el contenido toma
-   el ancho completo. Solo CSS: sin cambios de markup ni de JS, y en
-   escritorio (>768px) no cambia nada.
+   dejaban ~129px útiles a 390px de ancho. Solo CSS + el toggle mínimo de
+   JS de BIT-58: sin segunda lista de navegación, en escritorio (>768px)
+   no cambia nada.
    ============================================================ */
 @media (max-width: 768px) {
   .rodeo-header {
@@ -273,25 +287,50 @@
   }
   .rodeo-header-establecimiento { order: 3; flex: 1 1 100%; }
   .rodeo-header-establecimiento select { width: 100%; padding: 10px 14px; font-size: 15px; }
-  .rodeo-header-user { gap: 8px; }
-  .rodeo-header-volver { padding: 10px 14px; min-height: 40px; display: inline-flex; align-items: center; }
+  /* Propia fila -- antes competía por espacio con brand+Volver en la
+     primera línea, que ahora además comparte con el botón ☰. */
+  .rodeo-header-user { order: 4; flex: 1 1 100%; gap: 8px; }
+  .rodeo-menu-toggle { display: flex; }
+
+  /* "Volver a módulos" se reubica por JS (main.js, BIT-58) dentro del
+     panel de navegación en móvil -- mismo <a>, sin duplicar. Pisa el
+     estilo de píldora clara pensado para el header oscuro (.rodeo-header-
+     volver) porque acá vive sobre el fondo claro del panel: toma el
+     mismo lenguaje visual que el resto de los ítems de navegación, con
+     un separador arriba para distinguirlo de los módulos. */
+  .rodeo-sidebar-item-volver.rodeo-header-volver {
+    margin: 8px 0 0; padding: 14px 14px 0;
+    border-top: 1px solid var(--border);
+    border-radius: 0;
+    background: transparent;
+    color: var(--muted);
+    min-height: 44px;
+    display: flex; align-items: center;
+  }
+  .rodeo-sidebar-item-volver.rodeo-header-volver:hover { background: transparent; color: var(--dark-teal); }
 
   .rodeo-body-row { flex-direction: column; }
 
+  /* Panel desplegable (no drawer/overlay): mismo <nav id="rodeo-sidebar">
+     de siempre, oculto por defecto y mostrado en el flujo normal del
+     documento (empuja el contenido, no tapa nada) cuando main.js agrega
+     .rodeo-sidebar-open al togglear ☰. */
   .rodeo-sidebar {
+    display: none;
     width: auto;
-    flex-direction: row;
-    gap: 4px;
-    padding: 8px 10px;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px;
     border-right: none;
     border-bottom: 1px solid var(--border);
-    overflow-x: auto;
+    max-height: 70vh; max-height: 70dvh;
+    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
+  .rodeo-sidebar.rodeo-sidebar-open { display: flex; }
   .rodeo-sidebar-item {
-    flex-shrink: 0;
     white-space: nowrap;
-    padding: 10px 14px;
+    padding: 12px 14px;
     min-height: 44px;
     display: flex; align-items: center;
   }
