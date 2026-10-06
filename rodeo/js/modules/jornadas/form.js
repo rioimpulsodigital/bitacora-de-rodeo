@@ -28,6 +28,19 @@ export async function mountJornadaForm(contenedor, ctx, id, { soloLecturaForzada
   const hoy = new Date().toISOString().slice(0, 10);
   const disabled = soloLectura ? 'disabled' : '';
 
+  // Establecimiento (BIT-61): inmutable una vez creada la Jornada -- acá
+  // solo se muestra como texto, nunca como campo editable, ni siquiera al
+  // editar fecha/horas/notas de una Jornada propia. Al crear una nueva
+  // (vía el historial, no el flujo operativo) sí es obligatorio elegirlo.
+  const campoEstablecimiento = jornada
+    ? `<label class="form-label">Establecimiento</label>
+       <p class="form-field" style="background:var(--surface2)">${escapeHtml(jornada.establecimientos?.nombre ?? '—')}</p>`
+    : `<label class="form-label">Establecimiento <span class="rodeo-required">*</span></label>
+       <select class="form-field" name="establecimiento_id" required>
+         <option value="">Seleccionar establecimiento…</option>
+         ${ctx.establecimientos.map((est) => `<option value="${est.id}" ${est.id === ctx.establecimientoActivoId ? 'selected' : ''}>${escapeHtml(est.nombre)}</option>`).join('')}
+       </select>`;
+
   contenedor.innerHTML = `
     <div class="rodeo-card">
       <div class="rodeo-card-header">
@@ -36,6 +49,8 @@ export async function mountJornadaForm(contenedor, ctx, id, { soloLecturaForzada
       </div>
       ${soloLectura && jornada && !esPropia ? '<p class="rodeo-hint">Esta jornada pertenece a otra persona — solo lectura.</p>' : ''}
       <form id="rodeo-jornada-form">
+        ${campoEstablecimiento}
+
         <label class="form-label">Fecha</label>
         <input class="form-field" type="date" name="fecha" value="${jornada?.fecha ?? hoy}" ${disabled} required>
 
@@ -52,7 +67,7 @@ export async function mountJornadaForm(contenedor, ctx, id, { soloLecturaForzada
 
         <div class="rodeo-form-acciones">
           ${soloLectura ? '' : `<button type="submit" class="salida-btn">Guardar</button>`}
-          <a href="#jornadas" class="rodeo-link-btn">Volver al listado</a>
+          <a href="#jornadas/historial" class="rodeo-link-btn">Volver al listado</a>
         </div>
       </form>
     </div>
@@ -68,10 +83,16 @@ export async function mountJornadaForm(contenedor, ctx, id, { soloLecturaForzada
       hora_llegada: fd.get('hora_llegada'),
       hora_salida: fd.get('hora_salida'),
       notas: fd.get('notas'),
+      establecimiento_id: fd.get('establecimiento_id'),
     };
 
     const errorEl = document.getElementById('rodeo-form-error');
     errorEl.textContent = '';
+
+    if (!jornada && !campos.establecimiento_id) {
+      errorEl.textContent = 'El establecimiento es obligatorio.';
+      return;
+    }
 
     if (campos.hora_llegada && campos.hora_salida && campos.hora_salida <= campos.hora_llegada) {
       errorEl.textContent = 'La hora de salida debe ser posterior a la de llegada.';
@@ -81,7 +102,7 @@ export async function mountJornadaForm(contenedor, ctx, id, { soloLecturaForzada
     try {
       if (jornada) await actualizarJornada(jornada.id, campos);
       else await crearJornada(campos, ctx.perfil.id);
-      location.hash = '#jornadas';
+      location.hash = '#jornadas/historial';
     } catch (err) {
       errorEl.textContent = 'Error al guardar: ' + err.message;
     }

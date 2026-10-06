@@ -271,6 +271,33 @@
   object-fit: cover;
 }
 
+/* Pantalla operativa de Jornada (BIT-61) -- LLEGADA/SALIDA. Reutiliza
+   .rodeo-card/.salida-btn/.rodeo-hint/.rodeo-link-btn ya existentes. */
+.rodeo-jornada-operativa {
+  max-width: 420px;
+  margin: 0 auto;
+  text-align: center;
+}
+.rodeo-jornada-operativa h2 { text-align: center; }
+.rodeo-jornada-fecha {
+  font-family: var(--font-display); font-size: 13px;
+  color: var(--muted); text-transform: capitalize; margin: 0 0 4px;
+}
+.rodeo-jornada-establecimiento { font-size: 14px; color: var(--muted); margin: 0 0 16px; }
+.rodeo-jornada-reloj {
+  font-family: var(--font-display); font-size: 48px; font-weight: 600;
+  color: var(--dark-teal); margin: 0 0 20px; line-height: 1;
+}
+.rodeo-jornada-dato { font-size: 15px; margin: 0 0 8px; }
+.rodeo-jornada-duracion { font-size: 13px; color: var(--muted); margin: 0 0 20px; }
+.rodeo-jornada-btn { font-size: 20px; letter-spacing: 0.04em; padding: 20px; }
+.rodeo-jornada-btn-salida { background: linear-gradient(135deg, var(--orange), #d9540a); }
+.rodeo-jornada-aviso {
+  background: #fff3cd; border: 1px solid #e0c674; color: #6b5410;
+  border-radius: 12px; padding: 10px 14px; font-size: 13px;
+  margin: 0 0 16px; text-align: left;
+}
+
 /* ============================================================
    RESPONSIVE del shell (BIT-50 hallazgo H-09 -- base; BIT-58
    reemplaza la franja horizontal de módulos por un menú ☰).

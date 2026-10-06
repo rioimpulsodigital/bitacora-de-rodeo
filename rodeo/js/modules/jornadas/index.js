@@ -6,12 +6,18 @@
 import { registerRoute } from '../../router.js';
 import { mountJornadasList } from './list.js';
 import { mountJornadaForm } from './form.js';
+import { mountJornadaOperativa } from './operativa.js';
 
+// BIT-61: #jornadas pasa a ser la pantalla operativa (LLEGADA/SALIDA) --
+// es la experiencia principal del turno de trabajo. El listado/CRUD
+// histórico de siempre (con Ver/Editar de BIT-57 y Papelera) se conserva
+// intacto, solo se mueve a #jornadas/historial.
 export function registrarRutasJornadas(contenedor, ctx) {
   registerRoute('jornadas', (partes) => {
     if (partes[0] === 'nueva') mountJornadaForm(contenedor, ctx, null);
     else if (partes[0] === 'ver') mountJornadaForm(contenedor, ctx, partes[1], { soloLecturaForzada: true });
     else if (partes[0] === 'editar') mountJornadaForm(contenedor, ctx, partes[1]);
-    else mountJornadasList(contenedor, ctx);
+    else if (partes[0] === 'historial') mountJornadasList(contenedor, ctx);
+    else mountJornadaOperativa(contenedor, ctx);
   });
 }
