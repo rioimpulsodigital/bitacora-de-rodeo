@@ -137,5 +137,25 @@ SELECT p.proname, pg_get_functiondef(p.oid) AS definicion
 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 WHERE n.nspname = 'public' AND p.proname IN ('tiene_acceso_establecimiento', 'is_admin');
 
+-- B8) Candidato real para el Caso 4 de la validación transaccional (Paso 3
+--     de migration-BIT-61-final.sql, "sin acceso real al establecimiento"):
+--     un establecimiento que EXISTE de verdad (para que la FK pase) pero
+--     al que Etel no tiene NINGÚN vínculo en establecimientos_usuarios --
+--     así el INSERT de prueba falla por autorización
+--     (tiene_acceso_establecimiento = false), que es lo que se quiere
+--     demostrar, no por un id inventado que ni siquiera existe. Usar el
+--     primer resultado como <ESTABLECIMIENTO_SIN_ACCESO_REAL_ID>. Si no
+--     devuelve ninguna fila (Etel está vinculada a TODOS los
+--     establecimientos existentes), reportarlo -- el Caso 4 no sería
+--     cubrible con datos reales hoy, y no se debe fabricar uno.
+SELECT e.id, e.nombre
+FROM establecimientos e
+WHERE NOT EXISTS (
+  SELECT 1 FROM establecimientos_usuarios eu
+  WHERE eu.establecimiento_id = e.id
+    AND eu.perfil_id = 'ebb6f7b7-9f9d-45a3-be64-0785a8ad6a82'
+)
+ORDER BY e.nombre;
+
 -- Si algo de esto contradice lo asumido en migration-BIT-61-final.sql:
 -- DETENERSE y reportar antes de aplicar esa migración.

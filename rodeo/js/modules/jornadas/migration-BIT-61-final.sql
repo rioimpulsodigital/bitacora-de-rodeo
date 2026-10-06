@@ -53,16 +53,29 @@
 -- PASO 2 — CAMBIO
 -- ════════════════════════════════════════════════════════════════════════
 
--- ── 2a) jornadas.establecimiento_id (idempotente) ──────────────────────────
+-- ── 2a) jornadas.establecimiento_id (idempotente, NOT NULL) ────────────────
 -- uuid, FK a establecimientos(id), sin ON DELETE especial (NO ACTION --
 -- mismo patrón que atenciones_clinicas.establecimiento_id, BIT-11).
--- NULLABLE a nivel de columna -- no por filas históricas (confirmado 0),
--- sino porque un NOT NULL de columna es una restricción más rígida que la
--- real: la obligatoriedad para Jornadas NUEVAS ya la impone la policy del
--- Paso 2e (WITH CHECK), y dejar la columna nullable evita que un futuro
--- cambio de policy quede atado también a una restricción de schema.
+-- NOT NULL: Claudy confirmó 0 Jornadas existentes (sin filas históricas que
+-- necesiten compatibilidad con NULL) y la regla de dominio es absoluta --
+-- "una Jornada SIEMPRE pertenece a un establecimiento". La policy del Paso
+-- 2e sigue siendo necesaria (valida propietario, acceso real y Jornada
+-- habilitada -- cosas que un NOT NULL no puede expresar), pero la
+-- integridad estructural básica (que la columna nunca quede vacía) no debe
+-- depender solo de RLS -- la hace cumplir la propia base.
+-- Sin DEFAULT: con 0 filas no hace falta, y un DEFAULT inventaría un valor
+-- para cualquier fila futura que lo omitiera por error.
+-- Estrategia idempotente en 2 pasos para garantizar el estado final
+-- (is_nullable = NO) sin importar si la columna ya existía de una corrida
+-- parcial anterior: ADD COLUMN IF NOT EXISTS no aplicaría el NOT NULL si
+-- la columna ya existe sin él (la cláusula completa se saltea), así que el
+-- ALTER COLUMN SET NOT NULL de abajo lo confirma siempre -- es un no-op
+-- seguro si ya es NOT NULL.
 ALTER TABLE public.jornadas
-  ADD COLUMN IF NOT EXISTS establecimiento_id uuid REFERENCES public.establecimientos(id);
+  ADD COLUMN IF NOT EXISTS establecimiento_id uuid REFERENCES public.establecimientos(id) NOT NULL;
+
+ALTER TABLE public.jornadas
+  ALTER COLUMN establecimiento_id SET NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_jornadas_establecimiento_id ON public.jornadas(establecimiento_id);
 
@@ -150,6 +163,11 @@ CREATE POLICY jornadas_insert ON public.jornadas
     AND tiene_acceso_establecimiento(establecimiento_id)
     AND tiene_jornada_habilitada(establecimiento_id)
   );
+-- `establecimiento_id IS NOT NULL` queda acá aunque la columna ya sea
+-- NOT NULL (Paso 2a) -- redundante a propósito: la policy documenta por sí
+-- sola sus 3 condiciones reales (propietario, acceso, capacidad) sin
+-- depender de que quien la lea sepa además el estado del constraint de
+-- columna. La integridad estructural no depende de esta línea.
 -- jornadas_update NO se toca: el cierre (SALIDA) no queda condicionado a
 -- que jornada_habilitada siga activa (regla 4) -- la única protección
 -- nueva sobre UPDATE es el trigger del Paso 2c. jornadas_select tampoco se
@@ -183,20 +201,27 @@ TO authenticated;
 -- Por PK compuesta real, NO por nombre -- IDs confirmados por Claudy:
 --   Etel Salinas: ebb6f7b7-9f9d-45a3-be64-0785a8ad6a82
 --   Fundación Dolly: 342b589b-91bf-4eed-b34e-b7fdbd4acd4d
-UPDATE public.establecimientos_usuarios
-SET jornada_habilitada = true
-WHERE perfil_id = 'ebb6f7b7-9f9d-45a3-be64-0785a8ad6a82'
-  AND establecimiento_id = '342b589b-91bf-4eed-b34e-b7fdbd4acd4d';
-
--- Verificación inmediata obligatoria -- debe afectar EXACTAMENTE 1 fila.
--- Si GET DIAGNOSTICS informa 0: la fila no existe (contradice B6 del
--- diagnóstico) -- DETENERSE y reportar, no reintentar con otro criterio.
--- Si informa más de 1: imposible dada la PK compuesta -- DETENERSE igual.
+--
+-- El UPDATE va DENTRO del mismo bloque DO que el GET DIAGNOSTICS -- no
+-- como sentencia SQL suelta antes del bloque. GET DIAGNOSTICS ... ROW_COUNT
+-- solo captura el resultado del último comando SQL ejecutado DENTRO del
+-- mismo bloque PL/pgSQL; un UPDATE anterior fuera del bloque no es visible
+-- ahí (corrección de Bren/KLIAM sobre la versión previa de este archivo).
+-- Debe afectar EXACTAMENTE 1 fila: 0 significa que la fila no existe
+-- (contradice B6 del diagnóstico) -- DETENERSE y reportar, no reintentar
+-- con otro criterio; más de 1 es imposible dada la PK compuesta, pero se
+-- verifica igual por disciplina.
 DO $$
 DECLARE
   v_filas integer;
 BEGIN
+  UPDATE public.establecimientos_usuarios
+  SET jornada_habilitada = true
+  WHERE perfil_id = 'ebb6f7b7-9f9d-45a3-be64-0785a8ad6a82'
+    AND establecimiento_id = '342b589b-91bf-4eed-b34e-b7fdbd4acd4d';
+
   GET DIAGNOSTICS v_filas = ROW_COUNT;
+
   RAISE NOTICE 'Filas afectadas por la habilitación semilla de Etel/Fundación Dolly: %', v_filas;
   IF v_filas <> 1 THEN
     RAISE EXCEPTION 'Se esperaba exactamente 1 fila afectada, se afectaron %. Revisar antes de continuar.', v_filas;
@@ -249,11 +274,14 @@ WHERE perfil_id = 'ebb6f7b7-9f9d-45a3-be64-0785a8ad6a82'
 --   VALUES (auth.uid(), '342b589b-91bf-4eed-b34e-b7fdbd4acd4d', current_date, '08:00:00')
 --   RETURNING id; -- anotar como <jornada_1_id>
 --
---   -- Caso 2 -- establecimiento_id NULL → DEBE FALLAR (policy):
+--   -- Caso 2 -- establecimiento_id NULL → DEBE FALLAR, ahora por el
+--   -- constraint de columna (23502 not_null_violation) ANTES de que la
+--   -- policy llegue a evaluarse -- exactamente el objetivo del Paso 2a:
+--   -- la integridad no depende solo de RLS:
 --   SAVEPOINT caso_2;
 --   INSERT INTO public.jornadas (profesional_id, establecimiento_id, fecha, hora_llegada)
 --   VALUES (auth.uid(), NULL, current_date, '08:00:00');
---   -- (esperar error; después): ROLLBACK TO SAVEPOINT caso_2;
+--   -- (esperar error 23502; después): ROLLBACK TO SAVEPOINT caso_2;
 --
 --   -- Caso 3 -- acceso general SÍ, jornada_habilitada NO → DEBE FALLAR:
 --   SAVEPOINT caso_3;
@@ -261,11 +289,20 @@ WHERE perfil_id = 'ebb6f7b7-9f9d-45a3-be64-0785a8ad6a82'
 --   VALUES (auth.uid(), '<ESTABLECIMIENTO_CON_ACCESO_SIN_JORNADA_ID>', current_date, '08:00:00');
 --   -- (esperar error; después): ROLLBACK TO SAVEPOINT caso_3;
 --
---   -- Caso 4 -- sin acceso real al establecimiento (id sintético, no
---   -- vinculado a Etel) → DEBE FALLAR:
+--   -- Caso 4 -- sin acceso real al establecimiento. Usa un establecimiento
+--   -- que EXISTE de verdad (pasa la FK) pero al que Etel no tiene ningún
+--   -- vínculo en establecimientos_usuarios -- así la falla demuestra
+--   -- autorización (tiene_acceso_establecimiento = false), no un error de
+--   -- FK por un id inventado (gen_random_uuid() fallaría por la FK antes
+--   -- de llegar a probar nada de autorización). Completar
+--   -- <ESTABLECIMIENTO_SIN_ACCESO_REAL_ID> con el resultado real de la
+--   -- consulta B8 de diagnostico-BIT-61-final.sql -- no inventarlo. Si esa
+--   -- consulta no devuelve ningún candidato (Etel vinculada a todos los
+--   -- establecimientos existentes), este caso no es cubrible con datos
+--   -- reales hoy -- documentarlo así, no fabricar uno:
 --   SAVEPOINT caso_4;
 --   INSERT INTO public.jornadas (profesional_id, establecimiento_id, fecha, hora_llegada)
---   VALUES (auth.uid(), gen_random_uuid(), current_date, '08:00:00');
+--   VALUES (auth.uid(), '<ESTABLECIMIENTO_SIN_ACCESO_REAL_ID>', current_date, '08:00:00');
 --   -- (esperar error; después): ROLLBACK TO SAVEPOINT caso_4;
 --
 --   -- Caso 5 -- intento de cambiar establecimiento_id de la Jornada propia
@@ -316,6 +353,8 @@ WHERE perfil_id = 'ebb6f7b7-9f9d-45a3-be64-0785a8ad6a82'
 --   -- Estructura:
 --   SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns
 --   WHERE table_schema='public' AND table_name='jornadas' AND column_name='establecimiento_id';
+--   -- is_nullable debe dar 'NO' -- objetivo final verificable de la
+--   -- corrección 2 (regla de dominio absoluta, no solo RLS).
 --   SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns
 --   WHERE table_schema='public' AND table_name='establecimientos_usuarios' AND column_name='jornada_habilitada';
 --   SELECT indexname FROM pg_indexes WHERE tablename='jornadas' AND indexname='idx_jornadas_establecimiento_id';
