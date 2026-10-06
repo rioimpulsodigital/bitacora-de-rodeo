@@ -1,15 +1,23 @@
 -- BIT-61 — Migración FINAL: Jornada por establecimiento + capacidad
 -- habilitable por Usuario × Establecimiento
 -- EJECUTAR CON CLAUDY en Supabase SQL Editor — Producción
--- ESTADO: PREPARADA, NO APLICADA. Requiere: (1) correr primero
--- diagnostico-BIT-61-final.sql completo y confirmar que nada contradice lo
--- asumido acá; (2) autorización explícita de Bren/KLIAM sobre este SQL y
--- los resultados reales del diagnóstico.
+-- ESTADO: PREPARADA, NO APLICADA. Requiere autorización explícita final de
+-- Bren/KLIAM sobre este SQL.
 --
 -- Reemplaza a las dos parejas de archivos preparadas en rondas anteriores
--- (diagnostico/migration-BIT-61-establecimiento-jornada.sql y
--- diagnostico/migration-BIT-61-capacidad-jornada.sql, retiradas del repo)
--- -- este es el único SQL final a revisar y, eventualmente, aplicar.
+-- (retiradas del repo) -- este es el único SQL final a revisar y,
+-- eventualmente, aplicar.
+--
+-- ─── DIAGNÓSTICO YA CONFIRMADO POR CLAUDY (05 Oct 2026) ──────────────────
+-- Ya no hace falta lenguaje condicional sobre estos tres puntos:
+--   1. 0 Jornadas existentes en Producción -- establecimiento_id puede
+--      agregarse sin ningún caso de fila histórica a resolver.
+--   2. migration-BIT-49c-proteger-columnas-soft-delete-jornadas.sql SÍ está
+--      aplicada -- authenticated tiene GRANT por columna, no por tabla
+--      completa, sobre jornadas.
+--   3. Etel ya tiene fila en establecimientos_usuarios para Fundación
+--      Dolly (perfil_id ebb6f7b7-9f9d-45a3-be64-0785a8ad6a82,
+--      establecimiento_id 342b589b-91bf-4eed-b34e-b7fdbd4acd4d).
 --
 -- ─── REGLAS CONFIRMADAS QUE IMPLEMENTA ESTE ARCHIVO ──────────────────────
 -- 1. Una Jornada pertenece a un único establecimiento.
@@ -31,20 +39,15 @@
 -- abierta para crear/cerrar una Jornada, así que acá el backend SÍ tiene
 -- que exigirlo, no alcanza con ocultar el menú.
 --
--- ─── DATOS EXISTENTES — NO SE INFIERE NI SE BORRA NADA ───────────────────
--- Si el diagnóstico (A2/A3) confirma Jornadas reales ya cargadas: quedan
--- con establecimiento_id = NULL tal cual, documentadas. NO se infiere por
--- fecha, por el selector activo de ese momento, ni por ningún registro
--- relacionado. Backfill manual validado por Bren/KLIAM/Etel es la única
--- estrategia seria, y es una decisión de ESE momento, no de esta migración.
+-- ─── DEUDA DETECTADA, NO CORREGIDA ACÁ ────────────────────────────────────
+-- Claudy detectó privilegios TRUNCATE en tablas del dominio durante el
+-- diagnóstico. No se corrige en BIT-61 -- queda documentado como deuda de
+-- BIT-59 (estándar de grants explícitos). Tampoco se amplía esta tarea a
+-- auditar grants/roles de otras tablas que Claudy no relevó para BIT-61.
 
--- ── PASO 1 — DIAGNÓSTICO (obligatorio, archivo aparte) ─────────────────────
--- Correr diagnostico-BIT-61-final.sql completo ANTES de seguir. En
--- particular: A2/A3 (filas existentes de jornadas), A5 (texto real de
--- jornadas_insert/update), A6 (triggers existentes), A7 (si BIT-49c está
--- aplicada), B1 (tipo de establecimientos.id), B2-B5 (estructura/RLS/grants
--- reales de establecimientos_usuarios), B6 (si Etel ya tiene fila para
--- Fundación Dolly).
+-- ── PASO 1 — DIAGNÓSTICO (ya ejecutado por Claudy) ─────────────────────────
+-- diagnostico-BIT-61-final.sql, resultados publicados en la sección
+-- "Diagnóstico Producción — Claudy" del informe de BIT-61 en Notion.
 
 -- ════════════════════════════════════════════════════════════════════════
 -- PASO 2 — CAMBIO
@@ -52,25 +55,23 @@
 
 -- ── 2a) jornadas.establecimiento_id (idempotente) ──────────────────────────
 -- uuid, FK a establecimientos(id), sin ON DELETE especial (NO ACTION --
--- mismo patrón que atenciones_clinicas.establecimiento_id, BIT-11, el único
--- precedente real en el repo). NULLABLE a nivel de columna por las
--- Jornadas históricas del diagnóstico A2/A3 -- la obligatoriedad real para
--- Jornadas NUEVAS la impone la policy del Paso 2d (WITH CHECK), no un
--- NOT NULL que rompería la migración si hay filas existentes.
+-- mismo patrón que atenciones_clinicas.establecimiento_id, BIT-11).
+-- NULLABLE a nivel de columna -- no por filas históricas (confirmado 0),
+-- sino porque un NOT NULL de columna es una restricción más rígida que la
+-- real: la obligatoriedad para Jornadas NUEVAS ya la impone la policy del
+-- Paso 2e (WITH CHECK), y dejar la columna nullable evita que un futuro
+-- cambio de policy quede atado también a una restricción de schema.
 ALTER TABLE public.jornadas
   ADD COLUMN IF NOT EXISTS establecimiento_id uuid REFERENCES public.establecimientos(id);
 
 CREATE INDEX IF NOT EXISTS idx_jornadas_establecimiento_id ON public.jornadas(establecimiento_id);
 
 COMMENT ON COLUMN public.jornadas.establecimiento_id IS
-  'BIT-61: establecimiento al que pertenece la Jornada (el activo al presionar LLEGADA). NULL en Jornadas históricas anteriores a esta migración, nunca inferido. Inmutable después de creada -- ver trigger jornadas_bloquear_cambio_establecimiento.';
+  'BIT-61: establecimiento al que pertenece la Jornada (el activo al presionar LLEGADA). Inmutable después de creada -- ver trigger jornadas_bloquear_cambio_establecimiento.';
 
 -- ── 2b) establecimientos_usuarios.jornada_habilitada (idempotente) ─────────
 -- DEFAULT false (deny by default): ninguna fila existente queda habilitada
--- automáticamente -- se elige así a propósito, para no habilitar Jornada a
--- todo el mundo de golpe. Si se quisiera otro default, debería justificarse
--- explícitamente; no se encontró ninguna razón para apartarse de deny by
--- default acá.
+-- automáticamente.
 ALTER TABLE public.establecimientos_usuarios
   ADD COLUMN IF NOT EXISTS jornada_habilitada boolean NOT NULL DEFAULT false;
 
@@ -78,12 +79,11 @@ COMMENT ON COLUMN public.establecimientos_usuarios.jornada_habilitada IS
   'BIT-61 (transitorio -- ver BIT-56): true = este usuario puede operar Jornada (LLEGADA/SALIDA) en este establecimiento. Default false (deny by default). Reemplazar por el modelo genérico de capacidades de BIT-56 cuando exista.';
 
 -- ── 2c) Trigger: establecimiento_id inmutable después de creada ───────────
--- Mecanismo ÚNICO y universal -- no depende de si migration-BIT-49c está
--- aplicada o no (a diferencia de una restricción solo por GRANT de
--- columna, que sí dependería de eso). Bloquea el cambio al nivel más bajo
--- posible, para cualquier UPDATE que llegue por cualquier vía (API normal,
--- RPC futura, SQL directo de un rol no admin) -- solo un superusuario
--- modificando el propio trigger podría saltarlo.
+-- Mecanismo ÚNICO y universal -- no depende del GRANT de columna de
+-- BIT-49c. Bloquea el cambio al nivel más bajo posible, para cualquier
+-- UPDATE que llegue por cualquier vía (API normal, RPC futura, SQL directo
+-- de un rol no admin) -- solo un superusuario modificando el propio
+-- trigger podría saltarlo.
 CREATE OR REPLACE FUNCTION public.jornadas_bloquear_cambio_establecimiento()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -106,12 +106,9 @@ CREATE TRIGGER trg_jornadas_establecimiento_inmutable
 -- Mismo patrón real de autorización ya usado en el proyecto
 -- (tiene_acceso_establecimiento, BIT-04): SECURITY DEFINER, search_path
 -- fijo, REVOKE ALL FROM PUBLIC + REVOKE de anon + GRANT mínimo a
--- authenticated. Bypass is_admin() -- un ADMINISTRADOR siempre puede
--- operar Jornada donde tenga acceso, igual que el resto del sistema. Para
--- los demás roles, exige usuario autenticado real (auth.uid()) y una fila
--- en establecimientos_usuarios con jornada_habilitada = true para ese
--- perfil+establecimiento exactos -- valida usuario, establecimiento y la
--- relación activa Usuario × Establecimiento en una sola condición EXISTS.
+-- authenticated. Bypass is_admin(). Para los demás roles, exige usuario
+-- autenticado real (auth.uid()) y una fila en establecimientos_usuarios
+-- con jornada_habilitada = true para ese perfil+establecimiento exactos.
 CREATE OR REPLACE FUNCTION public.tiene_jornada_habilitada(p_establecimiento_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -142,9 +139,8 @@ GRANT EXECUTE ON FUNCTION public.tiene_jornada_habilitada(uuid) TO authenticated
 
 -- ── 2e) Policy jornadas_insert -- exige las 3 condiciones simultáneas ──────
 -- Reconstrucción a partir de lo documentado en BIT-46/49 (auth.uid() =
--- profesional_id) -- NO es el texto confirmado por pg_policies del Paso 1
--- (A5). ADAPTAR esta sentencia al resultado real si difiere, mismo
--- criterio que usó BIT-49 en su momento para jornadas_select.
+-- profesional_id) -- si el texto real que publicó Claudy en pg_policies
+-- difiere de esto, ADAPTAR esta sentencia antes de aplicar.
 DROP POLICY IF EXISTS jornadas_insert ON public.jornadas;
 CREATE POLICY jornadas_insert ON public.jornadas
   AS PERMISSIVE FOR INSERT TO public
@@ -155,83 +151,164 @@ CREATE POLICY jornadas_insert ON public.jornadas
     AND tiene_jornada_habilitada(establecimiento_id)
   );
 -- jornadas_update NO se toca: el cierre (SALIDA) no queda condicionado a
--- que jornada_habilitada siga activa (regla 4 confirmada) -- la única
--- protección nueva sobre UPDATE es el trigger del Paso 2c, que no depende
--- de esta policy. jornadas_select tampoco se toca.
+-- que jornada_habilitada siga activa (regla 4) -- la única protección
+-- nueva sobre UPDATE es el trigger del Paso 2c. jornadas_select tampoco se
+-- toca.
 
--- ── 2f) GRANT -- elegir SOLO UNA de las dos opciones según el Paso 1 (A7) ──
-
--- OPCIÓN A -- si el diagnóstico (A7) confirmó que migration-BIT-49c SÍ está
--- aplicada (authenticated con GRANT por columna, no por tabla completa):
---   GRANT INSERT (profesional_id, establecimiento_id, fecha, hora_llegada, hora_salida, notas)
---     ON public.jornadas TO authenticated;
---   -- UPDATE se deja EXACTAMENTE como quedó en BIT-49c (fecha, hora_llegada,
---   -- hora_salida, notas) -- NO agregar establecimiento_id ahí. El trigger
---   -- del Paso 2c ya lo protege de todos modos; esto es una segunda capa.
-
--- OPCIÓN B -- si el diagnóstico (A7/A8) confirmó que BIT-49c NO está
--- aplicada (authenticated sigue con INSERT/UPDATE a nivel de tabla
--- completa): no hace falta ningún GRANT nuevo -- el GRANT de tabla
--- completa ya cubre establecimiento_id en el INSERT, y el trigger del Paso
--- 2c protege la inmutabilidad en el UPDATE sin depender de ningún GRANT.
+-- ── 2f) GRANT -- único camino (BIT-49c confirmada aplicada) ────────────────
+-- authenticated tiene GRANT por columna sobre jornadas (no por tabla
+-- completa) desde BIT-49c -- establecimiento_id se agrega a la lista de
+-- columnas de INSERT. UPDATE se deja EXACTAMENTE como quedó en BIT-49c
+-- (fecha, hora_llegada, hora_salida, notas) -- NO se agrega
+-- establecimiento_id ahí: el trigger del Paso 2c es quien protege la
+-- inmutabilidad en el UPDATE, a propósito, como segunda capa de defensa
+-- independiente del GRANT.
+GRANT INSERT (
+  profesional_id,
+  establecimiento_id,
+  fecha,
+  hora_llegada,
+  hora_salida,
+  notas
+)
+ON public.jornadas
+TO authenticated;
 
 -- No se otorga `anon` en ningún caso. No se amplía ningún permiso existente
--- por conveniencia -- estándar preventivo BIT-59 aplicado desde ya.
+-- por conveniencia -- estándar preventivo BIT-59 aplicado desde ya. Los
+-- privilegios TRUNCATE que detectó Claudy en el diagnóstico NO se tocan
+-- acá -- quedan documentados como deuda de BIT-59 (ver cabecera).
 
--- ── 2g) Habilitar a Etel en Fundación Dolly (única vez, por nombre) ───────
--- El nombre se usa SOLO acá, como dato semilla puntual -- la aplicación
--- nunca decide por nombre. Requiere que el Paso 1 (B6) haya confirmado que
--- la fila de establecimientos_usuarios ya existe; si no, vincularla es un
--- prerequisito aparte, no algo que esta migración deba asumir.
-UPDATE public.establecimientos_usuarios eu
+-- ── 2g) Habilitar a Etel en Fundación Dolly (IDs reales, PK compuesta) ────
+-- Por PK compuesta real, NO por nombre -- IDs confirmados por Claudy:
+--   Etel Salinas: ebb6f7b7-9f9d-45a3-be64-0785a8ad6a82
+--   Fundación Dolly: 342b589b-91bf-4eed-b34e-b7fdbd4acd4d
+UPDATE public.establecimientos_usuarios
 SET jornada_habilitada = true
-FROM perfiles p, establecimientos e
-WHERE eu.perfil_id = p.id
-  AND eu.establecimiento_id = e.id
-  AND p.nombre = 'Etel Salinas'
-  AND e.nombre = 'Fundación Dolly';
+WHERE perfil_id = 'ebb6f7b7-9f9d-45a3-be64-0785a8ad6a82'
+  AND establecimiento_id = '342b589b-91bf-4eed-b34e-b7fdbd4acd4d';
+
+-- Verificación inmediata obligatoria -- debe afectar EXACTAMENTE 1 fila.
+-- Si GET DIAGNOSTICS informa 0: la fila no existe (contradice B6 del
+-- diagnóstico) -- DETENERSE y reportar, no reintentar con otro criterio.
+-- Si informa más de 1: imposible dada la PK compuesta -- DETENERSE igual.
+DO $$
+DECLARE
+  v_filas integer;
+BEGIN
+  GET DIAGNOSTICS v_filas = ROW_COUNT;
+  RAISE NOTICE 'Filas afectadas por la habilitación semilla de Etel/Fundación Dolly: %', v_filas;
+  IF v_filas <> 1 THEN
+    RAISE EXCEPTION 'Se esperaba exactamente 1 fila afectada, se afectaron %. Revisar antes de continuar.', v_filas;
+  END IF;
+END $$;
+
+-- Confirmación de solo lectura del estado final de esta fila puntual:
+SELECT perfil_id, establecimiento_id, jornada_habilitada
+FROM public.establecimientos_usuarios
+WHERE perfil_id = 'ebb6f7b7-9f9d-45a3-be64-0785a8ad6a82'
+  AND establecimiento_id = '342b589b-91bf-4eed-b34e-b7fdbd4acd4d';
+-- Esperado: jornada_habilitada = true.
 
 -- ════════════════════════════════════════════════════════════════════════
 -- PASO 3 — VALIDACIÓN EN TRANSACCIÓN (OBLIGATORIO, antes de comprometer)
 -- ════════════════════════════════════════════════════════════════════════
--- Ejecutar como los roles reales correspondientes (no service role).
+-- El SQL Editor de Supabase corre como el rol de la sesión (típicamente
+-- `postgres`), que NO es `authenticated` -- describir los casos no alcanza
+-- para probarlos de verdad. Técnica real para impersonar `authenticated`
+-- con un auth.uid() controlado, dentro de la MISMA transacción que se va a
+-- revertir: `SET LOCAL ROLE` cambia el rol efectivo (necesario para que
+-- los GRANT por columna de BIT-49c se evalúen de verdad -- como postgres
+-- NO se probaría eso) y `SET LOCAL request.jwt.claims` puebla lo que
+-- auth.uid()/auth.role() leen -- es el mecanismo real que usa PostgREST
+-- por request, reproducido acá a mano. Ambos `SET LOCAL` quedan
+-- automáticamente sin efecto al terminar la transacción (COMMIT o
+-- ROLLBACK), igual que cualquier INSERT/UPDATE hecho mientras tanto.
+--
+-- Requiere, además de los IDs de Etel/Dolly ya confirmados, el id real de
+-- un establecimiento al que Etel SÍ tenga acceso general pero NO
+-- jornada_habilitada (Caso 3) -- candidato: Establecimiento Fernández o
+-- Antinori (BIT-42, vinculados a Etel por acceso general). Completar
+-- <ESTABLECIMIENTO_CON_ACCESO_SIN_JORNADA_ID> con el id real antes de
+-- correr -- no inventarlo.
 --
 -- BEGIN;
 --
---   -- Caso 1 -- acceso permitido: usuario con jornada_habilitada=true en un
---   -- establecimiento al que tiene acceso → INSERT de jornada DEBE PASAR:
---   -- INSERT INTO jornadas (profesional_id, establecimiento_id, fecha, hora_llegada)
---   -- VALUES (auth.uid(), '<establecimiento_habilitado_id>', current_date, '08:00:00');
+--   SET LOCAL role = 'authenticated';
+--   SET LOCAL request.jwt.claims = '{"sub":"ebb6f7b7-9f9d-45a3-be64-0785a8ad6a82","role":"authenticated"}';
+--   SET LOCAL request.jwt.claim.sub = 'ebb6f7b7-9f9d-45a3-be64-0785a8ad6a82';
 --
---   -- Caso 2 -- establecimiento sin acceso real (tiene_acceso_establecimiento
---   -- = false) → DEBE FALLAR:
---   -- INSERT ... VALUES (auth.uid(), '<establecimiento_sin_acceso_id>', current_date, '08:00:00');
+--   -- Sanity check OBLIGATORIO -- confirmar que auth.uid() realmente
+--   -- devuelve el UUID de Etel antes de seguir. Si no coincide, DETENERSE:
+--   -- ningún caso de abajo estaría probando lo que dice probar.
+--   SELECT current_user, auth.uid(), auth.role();
 --
---   -- Caso 3 -- Jornada NO habilitada: acceso al establecimiento sí, pero
---   -- jornada_habilitada=false o sin fila → DEBE FALLAR:
---   -- INSERT ... VALUES (auth.uid(), '<establecimiento_sin_jornada_habilitada_id>', current_date, '08:00:00');
+--   -- Caso 1 -- acceso permitido + Jornada habilitada (Dolly) → DEBE PASAR:
+--   SAVEPOINT caso_1;
+--   INSERT INTO public.jornadas (profesional_id, establecimiento_id, fecha, hora_llegada)
+--   VALUES (auth.uid(), '342b589b-91bf-4eed-b34e-b7fdbd4acd4d', current_date, '08:00:00')
+--   RETURNING id; -- anotar como <jornada_1_id>
 --
---   -- Caso 4 -- Jornada SÍ habilitada → DEBE PASAR (repetir Caso 1 con otro
---   -- establecimiento si hay más de uno habilitado, para variar el dato).
+--   -- Caso 2 -- establecimiento_id NULL → DEBE FALLAR (policy):
+--   SAVEPOINT caso_2;
+--   INSERT INTO public.jornadas (profesional_id, establecimiento_id, fecha, hora_llegada)
+--   VALUES (auth.uid(), NULL, current_date, '08:00:00');
+--   -- (esperar error; después): ROLLBACK TO SAVEPOINT caso_2;
 --
---   -- Caso 5 -- ADMINISTRADOR, cualquier establecimiento con acceso, SIN
+--   -- Caso 3 -- acceso general SÍ, jornada_habilitada NO → DEBE FALLAR:
+--   SAVEPOINT caso_3;
+--   INSERT INTO public.jornadas (profesional_id, establecimiento_id, fecha, hora_llegada)
+--   VALUES (auth.uid(), '<ESTABLECIMIENTO_CON_ACCESO_SIN_JORNADA_ID>', current_date, '08:00:00');
+--   -- (esperar error; después): ROLLBACK TO SAVEPOINT caso_3;
+--
+--   -- Caso 4 -- sin acceso real al establecimiento (id sintético, no
+--   -- vinculado a Etel) → DEBE FALLAR:
+--   SAVEPOINT caso_4;
+--   INSERT INTO public.jornadas (profesional_id, establecimiento_id, fecha, hora_llegada)
+--   VALUES (auth.uid(), gen_random_uuid(), current_date, '08:00:00');
+--   -- (esperar error; después): ROLLBACK TO SAVEPOINT caso_4;
+--
+--   -- Caso 5 -- intento de cambiar establecimiento_id de la Jornada propia
+--   -- del Caso 1 → DEBE FALLAR por el trigger:
+--   SAVEPOINT caso_5;
+--   UPDATE public.jornadas SET establecimiento_id = gen_random_uuid() WHERE id = <jornada_1_id>;
+--   -- (esperar error; después): ROLLBACK TO SAVEPOINT caso_5;
+--
+--   -- Caso 6 -- UPDATE normal de hora_salida (SALIDA) sobre la Jornada del
+--   -- Caso 1, sin tocar establecimiento_id → DEBE PASAR:
+--   UPDATE public.jornadas SET hora_salida = '12:00:00' WHERE id = <jornada_1_id>;
+--
+--   -- Caso 7 -- revocar jornada_habilitada DESPUÉS de abrir y confirmar que
+--   -- SALIDA sigue funcionando igual (regla 4):
+--   -- 7a) abrir una segunda Jornada en Dolly, todavía como Etel:
+--   INSERT INTO public.jornadas (profesional_id, establecimiento_id, fecha, hora_llegada)
+--   VALUES (auth.uid(), '342b589b-91bf-4eed-b34e-b7fdbd4acd4d', current_date, '09:00:00')
+--   RETURNING id; -- anotar como <jornada_7_id>
+--   -- 7b) volver al rol de la sesión para la operación administrativa de
+--   -- revocar (un authenticated normal no debería poder tocar esta
+--   -- columna directamente -- no hay policy UPDATE para clientes sobre
+--   -- establecimientos_usuarios):
+--   RESET ROLE;
+--   UPDATE public.establecimientos_usuarios SET jornada_habilitada = false
+--   WHERE perfil_id = 'ebb6f7b7-9f9d-45a3-be64-0785a8ad6a82'
+--     AND establecimiento_id = '342b589b-91bf-4eed-b34e-b7fdbd4acd4d';
+--   -- 7c) volver a actuar como Etel (los claims siguen vigentes en esta
+--   -- misma transacción, solo hace falta retomar el rol):
+--   SET LOCAL role = 'authenticated';
+--   -- 7d) cerrar la Jornada del 7a a pesar de la capacidad revocada →
+--   -- DEBE PASAR igual:
+--   UPDATE public.jornadas SET hora_salida = '18:00:00' WHERE id = <jornada_7_id>;
+--
+--   -- Caso 8 -- ADMINISTRADOR, cualquier establecimiento con acceso, SIN
 --   -- fila de jornada_habilitada → DEBE PASAR (bypass is_admin() en
---   -- tiene_jornada_habilitada()).
+--   -- tiene_jornada_habilitada()). Repetir el bloque completo (RESET ROLE,
+--   -- SET LOCAL role/claims con el auth.uid() de un perfil ADMINISTRADOR
+--   -- real) como caso aparte si se quiere cubrir explícitamente -- no
+--   -- incluido arriba porque requiere el UUID real de un perfil
+--   -- ADMINISTRADOR, que todavía no está confirmado en este archivo.
 --
---   -- Caso 6 -- cerrar Jornada después de revocar el permiso: abrir una
---   -- Jornada (Caso 1), después UPDATE establecimientos_usuarios SET
---   -- jornada_habilitada=false para ese usuario+establecimiento, y recién
---   -- ahí intentar UPDATE jornadas SET hora_salida=... sobre esa misma
---   -- Jornada → DEBE PASAR igual (jornadas_update no se tocó).
---
---   -- Caso 7 -- intento de cambiar establecimiento_id de una Jornada ya
---   -- creada (propia) → DEBE FALLAR por el trigger:
---   -- UPDATE jornadas SET establecimiento_id = '<otro_id>' WHERE id = '<jornada_propia_id>';
---
---   -- Caso 8 -- UPDATE normal de fecha/hora_salida/notas (sin tocar
---   -- establecimiento_id) → DEBE SEGUIR FUNCIONANDO igual que antes.
---
--- ROLLBACK; -- no dejar registros de prueba en Producción
+-- ROLLBACK; -- revierte TODO lo de este bloque (inserts, el toggle de
+--           -- jornada_habilitada, todo) -- no queda ningún dato de prueba.
 
 -- ════════════════════════════════════════════════════════════════════════
 -- PASO 4 — VERIFICACIÓN POST-APLICACIÓN (SOLO LECTURA)
@@ -253,17 +330,23 @@ WHERE eu.perfil_id = p.id
 --   SELECT grantee, privilege_type FROM information_schema.role_routine_grants
 --   WHERE routine_name='tiene_jornada_habilitada';
 --   -- authenticated debe tener EXECUTE; anon NO debe aparecer.
+--   -- GRANT de columna de jornadas:
+--   SELECT a.attname, a.attacl FROM pg_attribute a
+--   WHERE a.attrelid='public.jornadas'::regclass AND a.attnum>0 AND NOT a.attisdropped AND a.attacl IS NOT NULL;
+--   -- establecimiento_id debe aparecer en la ACL de INSERT junto con las
+--   -- otras 5 columnas; NINGUNA columna debe tener establecimiento_id en UPDATE.
 --   -- Policy:
 --   SELECT policyname, cmd, with_check FROM pg_policies
 --   WHERE schemaname='public' AND tablename='jornadas' AND policyname='jornadas_insert';
---   -- Datos intactos (nada se borró ni se sobrescribió fuera de lo esperado):
---   SELECT count(*) FROM jornadas; -- debe coincidir con el conteo del diagnóstico A2
---   SELECT count(*) FROM jornadas WHERE establecimiento_id IS NOT NULL; -- debe seguir en 0 si A2 dio 0 jornadas
+--   -- Datos intactos (0 jornadas reales antes de aplicar -> 0 después,
+--   -- confirmado por Claudy):
+--   SELECT count(*) FROM jornadas;
+--   SELECT count(*) FROM jornadas WHERE establecimiento_id IS NOT NULL; -- debe dar 0
 --   -- Habilitación semilla:
 --   SELECT eu.*, p.nombre, e.nombre FROM establecimientos_usuarios eu
 --   JOIN perfiles p ON p.id=eu.perfil_id JOIN establecimientos e ON e.id=eu.establecimiento_id
 --   WHERE eu.jornada_habilitada = true;
---   -- Esperado: solo Etel + Fundación Dolly en true, el resto en false.
+--   -- Esperado: EXACTAMENTE Etel + Fundación Dolly en true, el resto en false.
 
 -- ════════════════════════════════════════════════════════════════════════
 -- PASO 5 — ROLLBACK (solo recuperación; requiere autorización explícita;
@@ -272,10 +355,11 @@ WHERE eu.perfil_id = p.id
 --   -- Solo si ninguna Jornada real llegó a usar establecimiento_id:
 --   SELECT count(*) FROM jornadas WHERE establecimiento_id IS NOT NULL; -- debe dar 0
 --
+--   REVOKE INSERT (establecimiento_id) ON public.jornadas FROM authenticated;
 --   DROP POLICY IF EXISTS jornadas_insert ON public.jornadas;
---   -- Recrear jornadas_insert con el texto EXACTO que tenía antes de esta
---   -- migración (tomado del Paso 1/A5 de ESTA migración, guardado antes de
---   -- aplicar -- no inventar un texto de memoria para el rollback).
+--   -- Recrear jornadas_insert con el texto EXACTO que publicó Claudy en el
+--   -- diagnóstico (sección "Diagnóstico Producción — Claudy" del informe
+--   -- de BIT-61) -- no inventar un texto de memoria para el rollback.
 --   DROP TRIGGER IF EXISTS trg_jornadas_establecimiento_inmutable ON public.jornadas;
 --   DROP FUNCTION IF EXISTS public.jornadas_bloquear_cambio_establecimiento();
 --   DROP FUNCTION IF EXISTS public.tiene_jornada_habilitada(uuid);
@@ -293,5 +377,4 @@ WHERE eu.perfil_id = p.id
 -- retirar esta columna y esta función, reemplazando su único call site (el
 -- WITH CHECK de jornadas_insert) por la función genérica que defina BIT-56.
 -- No se hardcodea ningún nombre de usuario ni de establecimiento en código
--- -- todo por id real; el nombre aparece solo en el Paso 2g, como dato
--- semilla puntual de esta aplicación concreta.
+-- -- el nombre no aparece en ningún lado de esta versión, solo IDs reales.
