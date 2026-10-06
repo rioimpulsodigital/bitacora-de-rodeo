@@ -8,7 +8,7 @@
 // actualizarJornada -- a propósito: la Jornada ya iniciada sigue
 // perteneciendo al establecimiento donde fue abierta, aunque después se
 // cambie el selector global. No es solo una convención de este archivo: la
-// migración de BIT-61 (migration-BIT-61-establecimiento-jornada.sql)
+// migración de BIT-61 (migration-BIT-61-final.sql)
 // excluye esa columna del GRANT de UPDATE cuando corresponda, para que
 // tampoco se pueda cambiar por fuera de este servicio.
 // RLS: profesional_id = auth.uid() (o is_admin() para ver/eliminar) sigue

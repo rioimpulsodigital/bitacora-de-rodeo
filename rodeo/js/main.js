@@ -44,7 +44,7 @@ async function iniciar() {
 
   // BIT-61: capacidad Jornada por Usuario × Establecimiento. Depende de
   // perfil.id, así que se pide después del Promise.all de arriba. Es
-  // transitorio (ver migration-BIT-61-capacidad-jornada.sql) -- BIT-56
+  // transitorio (ver migration-BIT-61-final.sql) -- BIT-56
   // reemplazará esto por el modelo genérico de capacidades.
   const capacidadesJornada = await getCapacidadesJornada(perfil.id);
 

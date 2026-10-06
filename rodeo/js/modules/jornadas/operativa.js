@@ -7,7 +7,7 @@
 // Establecimiento (corrección de regla de dominio, segunda ronda de
 // BIT-61): una Jornada pertenece a UN único establecimiento -- el que
 // estaba activo al presionar LLEGADA. Se persiste en
-// `jornadas.establecimiento_id` (migration-BIT-61-establecimiento-jornada.sql,
+// `jornadas.establecimiento_id` (migration-BIT-61-final.sql,
 // preparada, NO aplicada todavía) y es INMUTABLE después de creada: si la
 // usuaria cambia el selector global de establecimiento mientras tiene una
 // Jornada activa, esta pantalla sigue mostrando y operando sobre el
@@ -20,7 +20,7 @@
 //
 // Capacidad (tercera ronda de BIT-61): Jornada no es global -- se habilita
 // por Usuario × Establecimiento en `establecimientos_usuarios.jornada_
-// habilitada` (migration-BIT-61-capacidad-jornada.sql, preparada, NO
+// habilitada` (migration-BIT-61-final.sql, preparada, NO
 // aplicada). Gatea únicamente ABRIR una Jornada nueva; una ya activa
 // siempre se puede seguir viendo/cerrando aunque la capacidad se revoque
 // después de abierta (ver renderSinActiva/renderActiva).
