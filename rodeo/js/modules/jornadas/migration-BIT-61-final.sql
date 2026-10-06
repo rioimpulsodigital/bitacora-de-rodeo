@@ -278,6 +278,23 @@ WHERE perfil_id = 'ebb6f7b7-9f9d-45a3-be64-0785a8ad6a82'
 -- Esperado: jornada_habilitada = true.
 
 -- ════════════════════════════════════════════════════════════════════════
+-- SAVEPOINT GENERAL -- arranca la fase de VALIDACIÓN (corrección de esta
+-- ronda, Bren/KLIAM)
+-- ════════════════════════════════════════════════════════════════════════
+-- Todo lo que viene desde acá es exclusivamente para PROBAR que la
+-- migración funciona -- ningún dato de esta fase debe sobrevivir al COMMIT
+-- final. Los SAVEPOINT particulares de cada caso (caso_2 a caso_6, más
+-- abajo) NO garantizan eso por sí solos: solo sirven para poder seguir
+-- después de una falla ESPERADA sin abortar toda la transacción. Los
+-- Casos 1, 7 y 8 TIENEN ÉXITO (crean/modifican Jornadas reales y revocan
+-- jornada_habilitada temporalmente) y no revierten nada por su cuenta --
+-- sin este savepoint exterior, sus efectos quedarían persistidos en el
+-- COMMIT final. La garantía real es esta secuencia completa:
+--   SAVEPOINT validacion_inicio → (todos los casos) →
+--   ROLLBACK TO SAVEPOINT validacion_inicio → verificaciones → COMMIT.
+SAVEPOINT validacion_inicio;
+
+-- ════════════════════════════════════════════════════════════════════════
 -- VALIDACIÓN (misma transacción, obligatoria antes de decidir COMMIT)
 -- ════════════════════════════════════════════════════════════════════════
 -- El SQL Editor corre como el rol de la sesión (típicamente `postgres`),
@@ -412,17 +429,90 @@ UPDATE public.jornadas SET hora_salida = '18:00:00' WHERE id = '<jornada_8_id>';
 RESET ROLE;
 
 -- ════════════════════════════════════════════════════════════════════════
+-- LIMPIEZA DE LA VALIDACIÓN -- revertir SOLO lo que la validación escribió
+-- ════════════════════════════════════════════════════════════════════════
+-- Los Casos 1, 7 y 8 DEBÍAN pasar (son los "camino feliz") y por eso NO
+-- tienen su propio SAVEPOINT de recuperación como caso_2..caso_6 -- nada
+-- los revierte todavía. Si se dejara así, un COMMIT final persistiría en
+-- Producción: la Jornada de prueba del Caso 1 (y su cierre del Caso 7), la
+-- segunda Jornada de prueba del Caso 8, y la revocación TEMPORAL de
+-- jornada_habilitada que el propio Caso 8 aplica para probar que SALIDA
+-- sigue funcionando sin la capacidad. Nada de esto es dato real -- todo es
+-- parte de la validación y debe desaparecer antes de decidir COMMIT.
+--
+-- Por eso: revertir explícitamente TODO lo escrito desde el inicio de la
+-- validación con UN SOLO ROLLBACK a este SAVEPOINT puesto al final del
+-- Paso 2 (justo después de confirmar la semilla, antes de "VALIDACIÓN" --
+-- ver más arriba). Esto es lo único que garantiza que no queda información
+-- de prueba comiteada -- los SAVEPOINT caso_2..caso_6 NO alcanzan por sí
+-- solos para esto: esos solo permiten seguir la secuencia después de un
+-- fallo ESPERADO a mitad de camino, no limpian los casos que sí pasaron.
+--
+-- Revierte: Jornada del Caso 1, UPDATE de hora_salida del Caso 7, Jornada
+-- del Caso 8, y el UPDATE de jornada_habilitada=false del propio Caso 8.
+-- Preserva (todo lo de Paso 2, escrito ANTES de este SAVEPOINT): la
+-- columna establecimiento_id (NOT NULL + FK + índice), el trigger de
+-- inmutabilidad, la función tiene_jornada_habilitada(), la policy de
+-- jornadas_insert actualizada, el GRANT de columnas, y la semilla real
+-- Etel × Fundación Dolly con jornada_habilitada = true.
+ROLLBACK TO SAVEPOINT validacion_inicio;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- VERIFICACIONES OBLIGATORIAS POST-LIMPIEZA -- correr TODAS antes de decidir
+-- ════════════════════════════════════════════════════════════════════════
+-- Las 6 deben cumplirse. Si alguna no coincide con lo esperado: ROLLBACK
+-- completo (todavía no se hizo ningún COMMIT -- es seguro).
+
+-- 1) Ninguna Jornada de prueba debe haber quedado -- esperado: 0.
+SELECT count(*) AS jornadas_total FROM public.jornadas;
+
+-- 2) La semilla real de Etel × Fundación Dolly debe seguir habilitada --
+--    esperado: una fila, jornada_habilitada = true (el ROLLBACK TO
+--    SAVEPOINT de arriba no debe haber tocado esto: la semilla se escribió
+--    ANTES del SAVEPOINT validacion_inicio, en el Paso 2).
+SELECT perfil_id, establecimiento_id, jornada_habilitada
+FROM public.establecimientos_usuarios
+WHERE perfil_id = 'ebb6f7b7-9f9d-45a3-be64-0785a8ad6a82'
+  AND establecimiento_id = '342b589b-91bf-4eed-b34e-b7fdbd4acd4d';
+
+-- 3) establecimiento_id debe seguir siendo NOT NULL -- esperado:
+--    is_nullable = 'NO'.
+SELECT column_name, is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'public' AND table_name = 'jornadas' AND column_name = 'establecimiento_id';
+
+-- 4) El trigger de inmutabilidad debe seguir presente y habilitado.
+SELECT t.tgname, t.tgenabled, pg_get_triggerdef(t.oid) AS definicion
+FROM pg_trigger t
+WHERE t.tgrelid = 'public.jornadas'::regclass AND NOT t.tgisinternal;
+
+-- 5) La policy final de INSERT sobre jornadas debe exigir el acceso al
+--    establecimiento (tiene_jornada_habilitada()).
+SELECT policyname, cmd, qual, with_check
+FROM pg_policies
+WHERE schemaname = 'public' AND tablename = 'jornadas'
+ORDER BY cmd, policyname;
+
+-- 6) El GRANT de columnas de INSERT debe incluir establecimiento_id.
+SELECT a.attname, a.attacl
+FROM pg_attribute a
+WHERE a.attrelid = 'public.jornadas'::regclass AND a.attnum > 0 AND NOT a.attisdropped AND a.attacl IS NOT NULL;
+
+-- ════════════════════════════════════════════════════════════════════════
 -- DECISIÓN FINAL (manual, de Claudy/Bren -- no automática)
 -- ════════════════════════════════════════════════════════════════════════
--- Revisar que CADA caso se haya comportado EXACTAMENTE como se describe
--- arriba (los "DEBE PASAR" pasaron, los "DEBE FALLAR" fallaron con el
--- error/código esperado) antes de decidir:
+-- Condición para decidir, en este orden:
+--   (a) CADA caso de validación se comportó EXACTAMENTE como se describe
+--       arriba (los "DEBE PASAR" pasaron, los "DEBE FALLAR" fallaron con
+--       el error/código esperado), Y
+--   (b) las 6 verificaciones de arriba dieron el resultado esperado
+--       (jornadas_total = 0, semilla en true, is_nullable = NO, trigger
+--       presente, policy correcta, GRANT con establecimiento_id).
 --
---   Si TODO se comportó como se esperaba:
+--   Si (a) Y (b) se cumplen:
 --     COMMIT;
 --
---   Si CUALQUIER cosa fue inesperada (un caso que debía fallar no falló,
---   uno que debía pasar no pasó, un error distinto al esperado, etc.):
+--   Si CUALQUIER cosa de (a) o (b) fue inesperada:
 --     ROLLBACK;
 --
 -- No hay un estado intermedio -- es uno de los dos, de forma explícita y
@@ -459,7 +549,10 @@ RESET ROLE;
 --   WHERE schemaname='public' AND tablename='jornadas' AND policyname='jornadas_insert';
 --   -- Datos intactos (0 jornadas reales antes de aplicar -> 0 después,
 --   -- confirmado por Claudy -- todo lo de la validación se revirtió con
---   -- los SAVEPOINT/ROLLBACK TO SAVEPOINT, nada de eso queda comiteado):
+--   -- el ROLLBACK TO SAVEPOINT validacion_inicio, antes del COMMIT; los
+--   -- SAVEPOINT caso_2..caso_6 por sí solos NO garantizan esto -- solo
+--   -- permiten seguir la secuencia después de un fallo esperado a mitad
+--   -- de camino, no limpian los casos que debían pasar y pasaron):
 --   SELECT count(*) FROM jornadas;
 --   -- Habilitación semilla:
 --   SELECT eu.*, p.nombre, e.nombre FROM establecimientos_usuarios eu
