@@ -306,16 +306,27 @@ BEGIN
     VALUES (v_etel_id, v_dolly_id, current_date, '08:00:00')
     RETURNING id INTO v_jornada1_id;
 
-    -- Caso 2 — establecimiento_id NULL → DEBE FALLAR por NOT NULL (23502),
-    -- antes de que la policy llegue a evaluarse.
+    -- Caso 2 — establecimiento_id NULL → DEBE FALLAR específicamente por
+    -- el constraint NOT NULL (23502), AISLADO de la policy de RLS. La
+    -- policy jornadas_insert también exige `establecimiento_id IS NOT
+    -- NULL` en su WITH CHECK -- si este caso corriera como authenticated,
+    -- una fila con establecimiento_id=NULL violaría AMBAS defensas a la
+    -- vez (RLS y el constraint de columna), y no se podría afirmar cuál
+    -- de las dos detuvo realmente el INSERT (corrección de esta ronda,
+    -- Bren/KLIAM). Mismo criterio ya aplicado en los Casos 5/6 (GRANT vs.
+    -- trigger): se aísla la defensa probándola con rol elevado, que no
+    -- está sujeto a RLS -- la única defensa que puede intervenir queda
+    -- siendo el constraint NOT NULL de la propia columna.
+    EXECUTE 'RESET role';
     BEGIN
       INSERT INTO public.jornadas (profesional_id, establecimiento_id, fecha, hora_llegada)
       VALUES (v_etel_id, NULL, current_date, '08:00:00');
       RAISE EXCEPTION 'Caso 2: se esperaba fallo por NOT NULL y no falló' USING ERRCODE = 'ZZ099';
     EXCEPTION
       WHEN SQLSTATE '23502' THEN
-        RAISE NOTICE 'Caso 2 OK (23502 not_null_violation, como se esperaba).';
+        RAISE NOTICE 'Caso 2 OK (23502 not_null_violation, aislado de RLS -- el rol elevado no está sujeto a policy).';
     END;
+    EXECUTE 'SET LOCAL role = ''authenticated''';
 
     -- Caso 3 — acceso general SÍ, jornada_habilitada NO (Fernández) →
     -- DEBE FALLAR. Se verifica la precondición real antes de intentarlo.
