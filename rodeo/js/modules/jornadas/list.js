@@ -8,9 +8,13 @@ function fmtHora(t) {
 export async function mountJornadasList(contenedor, ctx) {
   contenedor.innerHTML = '<p class="rodeo-loading">Cargando jornadas…</p>';
 
+  // BIT-61: Historial siempre acotado al establecimiento activo -- nunca
+  // mezcla Jornadas de otro establecimiento aunque sean propias.
+  const nombreEstablecimientoActivo = ctx.establecimientos.find((e) => e.id === ctx.establecimientoActivoId)?.nombre ?? '—';
+
   let jornadas;
   try {
-    jornadas = await listJornadas();
+    jornadas = await listJornadas(ctx.establecimientoActivoId);
   } catch (e) {
     contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">Error al cargar jornadas: ${escapeHtml(e.message)}</p></div>`;
     return;
@@ -45,14 +49,14 @@ export async function mountJornadasList(contenedor, ctx) {
   contenedor.innerHTML = `
     <div class="rodeo-card">
       <div class="rodeo-card-header">
-        <h2>Jornadas</h2>
+        <h2>Jornadas en ${escapeHtml(nombreEstablecimientoActivo)}</h2>
         <a class="rodeo-btn" href="#jornadas/nueva">+ Nueva jornada</a>
       </div>
       ${mensajeHtml}
       <div id="jornadas-error" class="rodeo-error" style="display:none"></div>
       ${
         jornadas.length === 0
-          ? '<p>No hay jornadas registradas todavía.</p>'
+          ? `<p>No hay jornadas registradas todavía en ${escapeHtml(nombreEstablecimientoActivo)}.</p>`
           : `<table class="rodeo-table">
                <thead><tr><th>Fecha</th><th>Establecimiento</th><th>Llegada</th><th>Salida</th><th>Profesional</th><th></th></tr></thead>
                <tbody>${filas}</tbody>

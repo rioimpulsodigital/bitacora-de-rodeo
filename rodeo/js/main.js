@@ -89,7 +89,24 @@ async function iniciar() {
     setEstablecimientoActivoId(id);
     actualizarNavCatastro();
     actualizarNavJornadas();
-    resolverRuta();
+
+    // BIT-61 (corrección de UX, Bren/KLIAM): si la vista actual es del
+    // módulo Jornada (operativa, historial o cualquier subruta) y el
+    // establecimiento recién elegido no tiene la capacidad habilitada
+    // para este usuario, no tiene sentido volver a resolver esa misma
+    // ruta -- operativa.js la rechazaría mostrando el mensaje de "Jornada
+    // no está disponible para vos en X", que es la protección correcta
+    // para quien escribe #jornadas a mano, pero una mala experiencia para
+    // un cambio normal de establecimiento desde el selector. Se sale a
+    // una vista segura (#dashboard) en vez de dejar al usuario mirando
+    // ese rechazo. El gate real de seguridad sigue intacto en
+    // operativa.js -- esto es solo navegación, nunca lo reemplaza.
+    const moduloActual = location.hash.slice(1).split('/')[0];
+    if (moduloActual === 'jornadas' && !tieneJornadaHabilitada(activoId, capacidadesJornada, perfil)) {
+      location.hash = '#dashboard'; // dispara hashchange -> resolverRuta()
+    } else {
+      resolverRuta();
+    }
   });
 
   const contenedor = document.getElementById('rodeo-content');

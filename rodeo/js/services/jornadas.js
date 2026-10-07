@@ -17,10 +17,19 @@
 
 import { supabase } from '../../../js/core/supabase-client.js';
 
-export async function listJornadas() {
+// BIT-61 (corrección, Bren/KLIAM): el Historial filtra server-side por
+// establecimiento activo -- el establecimiento activo define el contexto
+// de trabajo, igual que el resto de la app. Antes traía TODAS las
+// Jornadas visibles por RLS (propias, o todas si ADMINISTRADOR) sin
+// filtrar por establecimiento, así que al cambiar de establecimiento
+// seguía mostrando Jornadas de uno distinto -- nunca debe mostrarse una
+// Jornada de otro establecimiento solo porque la propia Etel sea su
+// dueña.
+export async function listJornadas(establecimientoId) {
   const { data, error } = await supabase
     .from('jornadas')
     .select('id, fecha, hora_llegada, hora_salida, notas, profesional_id, establecimiento_id, perfiles(nombre), establecimientos(nombre)')
+    .eq('establecimiento_id', establecimientoId)
     .is('deleted_at', null)
     .order('fecha', { ascending: false });
 
