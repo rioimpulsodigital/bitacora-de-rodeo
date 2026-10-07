@@ -7,6 +7,7 @@ import { registerRoute } from '../../router.js';
 import { mountJornadasList } from './list.js';
 import { mountJornadaForm } from './form.js';
 import { mountJornadaOperativa } from './operativa.js';
+import { tieneJornadaHabilitada } from '../../services/establecimientos.js';
 
 // BIT-61: #jornadas pasa a ser la pantalla operativa (LLEGADA/SALIDA) --
 // es la experiencia principal del turno de trabajo. El listado/CRUD
@@ -14,6 +15,21 @@ import { mountJornadaOperativa } from './operativa.js';
 // intacto, solo se mueve a #jornadas/historial.
 export function registrarRutasJornadas(contenedor, ctx) {
   registerRoute('jornadas', (partes) => {
+    // Gate centralizado (corrección, Bren/KLIAM): antes solo
+    // operativa.js verificaba la capacidad -- escribir a mano
+    // #jornadas/historial o #jornadas/nueva en un establecimiento sin
+    // Jornada habilitada igual montaba esas pantallas. Si Jornada NO
+    // está habilitada para el establecimiento activo, NINGUNA subruta
+    // del módulo monta (ni operativa, ni historial, ni nueva, ni
+    // ver/editar) -- se redirige a #dashboard antes de despachar. El
+    // bypass de ADMINISTRADOR (dentro de tieneJornadaHabilitada) no se
+    // toca. operativa.js conserva su propio gate como defensa en
+    // profundidad para el caso en que esta función se llame igual.
+    if (!tieneJornadaHabilitada(ctx.establecimientoActivoId, ctx.capacidadesJornada, ctx.perfil)) {
+      location.hash = '#dashboard';
+      return;
+    }
+
     if (partes[0] === 'nueva') mountJornadaForm(contenedor, ctx, null);
     else if (partes[0] === 'ver') mountJornadaForm(contenedor, ctx, partes[1], { soloLecturaForzada: true });
     else if (partes[0] === 'editar') mountJornadaForm(contenedor, ctx, partes[1]);

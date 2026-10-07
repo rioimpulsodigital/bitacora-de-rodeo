@@ -29,6 +29,21 @@ export async function mountJornadaForm(contenedor, ctx, id, { soloLecturaForzada
       contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">Jornada no encontrada.</p></div>`;
       return;
     }
+
+    // BIT-61 (corrección, Bren/KLIAM): una Jornada histórica pertenece a
+    // UN establecimiento -- abrirla (Ver/Editar) desde un contexto activo
+    // DISTINTO mezclaría datos de dos establecimientos en una misma
+    // pantalla. Respuesta controlada en vez de auto-cambiar el
+    // establecimiento activo (eso sería una decisión silenciosa del
+    // sistema, no del usuario) o de redirigir sin explicación.
+    if (jornada.establecimiento_id && jornada.establecimiento_id !== ctx.establecimientoActivoId) {
+      const nombreEstablecimientoJornada = jornada.establecimientos?.nombre ?? 'otro establecimiento';
+      contenedor.innerHTML = `
+        <div class="rodeo-card">
+          <p class="rodeo-error">Esta Jornada pertenece a <strong>${escapeHtml(nombreEstablecimientoJornada)}</strong>, no al establecimiento activo. Cambiá de establecimiento arriba para verla, o volvé al <a href="#jornadas/historial">historial</a>.</p>
+        </div>`;
+      return;
+    }
   }
 
   // jornadas_update en BIT-04 es estrictamente auth.uid() = profesional_id,
