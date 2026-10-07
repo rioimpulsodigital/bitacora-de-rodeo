@@ -1,6 +1,19 @@
 import { getJornada, crearJornada, actualizarJornada } from '../../services/jornadas.js';
 import { escapeHtml } from '../../dashboard.js';
 
+// Mismo bug corregido en operativa.js (BIT-61): `toISOString()` da la
+// fecha en UTC, no en Argentina -- pasadas las 21:00 ART el default de
+// este campo quedaba adelantado un día. Fecha explícita en
+// America/Argentina/Buenos_Aires, no la zona del dispositivo.
+function fechaHoyArgentina() {
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const valor = (tipo) => partes.find((p) => p.type === tipo).value;
+  return `${valor('year')}-${valor('month')}-${valor('day')}`;
+}
+
 export async function mountJornadaForm(contenedor, ctx, id, { soloLecturaForzada = false } = {}) {
   let jornada = null;
 
@@ -25,7 +38,7 @@ export async function mountJornadaForm(contenedor, ctx, id, { soloLecturaForzada
   // sin entrar a edición, sin tocar el permiso real de escritura.
   const esPropia = jornada && jornada.profesional_id === ctx.perfil.id;
   const soloLectura = soloLecturaForzada || (jornada && !esPropia);
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = fechaHoyArgentina();
   const disabled = soloLectura ? 'disabled' : '';
 
   // Establecimiento (BIT-61): inmutable una vez creada la Jornada -- acá
