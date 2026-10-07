@@ -50,7 +50,6 @@ export async function mountJornadasList(contenedor, ctx) {
     <div class="rodeo-card">
       <div class="rodeo-card-header">
         <h2>Jornadas en ${escapeHtml(nombreEstablecimientoActivo)}</h2>
-        <a class="rodeo-btn" href="#jornadas/nueva">+ Nueva jornada</a>
       </div>
       ${mensajeHtml}
       <div id="jornadas-error" class="rodeo-error" style="display:none"></div>
