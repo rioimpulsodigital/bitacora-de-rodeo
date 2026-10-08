@@ -29,11 +29,33 @@ import { getJornadaActivaPropia, crearJornada, actualizarJornada } from '../../s
 import { tieneJornadaHabilitada } from '../../services/establecimientos.js';
 import { escapeHtml } from '../../dashboard.js';
 
+// Zona operativa única (corrección de bug real, BIT-61): antes, la fecha
+// salía de `toISOString()` (UTC) y la hora de `toTimeString()` (zona del
+// dispositivo) -- dos fuentes distintas. Pasadas las 21:00 ART, UTC ya
+// cruzó medianoche y la pantalla mostraba el día siguiente mientras la
+// hora seguía siendo la de hoy. Esa misma `fecha` se persistía al pulsar
+// LLEGADA -- no era solo un error visual. Todo (fecha/hora visibles,
+// fecha/hora persistidas, cálculo de duración) usa ahora esta única
+// fuente, expresada explícitamente en America/Argentina/Buenos_Aires en
+// vez de depender de que el dispositivo esté configurado en esa zona.
+const ZONA_OPERATIVA = 'America/Argentina/Buenos_Aires';
+// Argentina no tiene horario de verano desde 2009 -- UTC-03:00 fijo todo
+// el año. Reconstruir un instante real a partir de fecha+hora guardadas
+// (hora de pared de Buenos Aires) con ese offset explícito es exacto, sin
+// depender tampoco de la zona del dispositivo para ESTA cuenta.
+const OFFSET_ARGENTINA = '-03:00';
+
 function nowParts() {
-  const d = new Date();
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: ZONA_OPERATIVA,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hourCycle: 'h23', // explícito -- evita el "24:00" de medianoche que da hour12:false en algunos motores
+  }).formatToParts(new Date());
+  const valor = (tipo) => partes.find((p) => p.type === tipo).value;
   return {
-    fecha: d.toISOString().slice(0, 10),
-    hora: d.toTimeString().slice(0, 8),
+    fecha: `${valor('year')}-${valor('month')}-${valor('day')}`,
+    hora: `${valor('hour')}:${valor('minute')}:${valor('second')}`,
   };
 }
 
@@ -46,14 +68,15 @@ function fmtFecha(iso) {
   return `${d}/${m}/${y}`;
 }
 
-// Duración desde hora_llegada (HH:MM:SS) hasta ahora, mismo día. Simple a
-// propósito -- no corrige cruce de medianoche (una Jornada de terreno no
-// dura más de 24h; si ocurriera, el peor caso es un número negativo que
-// se recorta a 0, nunca un error).
-function calcularDuracion(horaLlegada) {
-  const [h, m, s] = horaLlegada.split(':').map(Number);
-  const inicio = new Date();
-  inicio.setHours(h, m, s || 0, 0);
+// Duración desde hora_llegada (HH:MM:SS, día `fecha`) hasta ahora. Se
+// reconstruye el instante real de LLEGADA con el offset fijo de Argentina
+// (no con setHours() en la zona del dispositivo, que es lo que mezclaba
+// zonas antes) para que la resta contra Date.now() sea correcta sin
+// importar la zona del dispositivo. Simple a propósito -- no corrige
+// Jornadas de más de 24h (no ocurren en terreno); si pasara, el peor caso
+// es un número negativo que se recorta a 0, nunca un error.
+function calcularDuracion(fecha, horaLlegada) {
+  const inicio = new Date(`${fecha}T${horaLlegada}${OFFSET_ARGENTINA}`);
   const diffMs = Math.max(0, Date.now() - inicio.getTime());
   const totalMin = Math.floor(diffMs / 60000);
   const hh = Math.floor(totalMin / 60);
@@ -91,13 +114,13 @@ export async function mountJornadaOperativa(contenedor, ctx) {
   function actualizarReloj() {
     const el = document.getElementById('jornada-reloj');
     if (!el || !el.isConnected) { limpiarIntervalos(); return; }
-    el.textContent = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+    el.textContent = new Date().toLocaleTimeString('es-AR', { timeZone: ZONA_OPERATIVA, hour: '2-digit', minute: '2-digit' });
   }
 
   function actualizarDuracion() {
     const el = document.getElementById('jornada-duracion');
     if (!el || !el.isConnected) { limpiarIntervalos(); return; }
-    el.textContent = `Tiempo activo: ${calcularDuracion(jornadaActiva.hora_llegada)}`;
+    el.textContent = `Tiempo activo: ${calcularDuracion(jornadaActiva.fecha, jornadaActiva.hora_llegada)}`;
   }
 
   function renderSinActiva() {
