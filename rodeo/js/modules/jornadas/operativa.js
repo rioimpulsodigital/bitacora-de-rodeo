@@ -111,10 +111,25 @@ export async function mountJornadaOperativa(contenedor, ctx) {
   // El router no tiene hook de "desmontar": estos timers se autolimpian
   // cuando su propio nodo deja de estar en el documento (el usuario
   // navegó a otra vista), en vez de depender de un evento que no existe.
-  function actualizarReloj() {
-    const el = document.getElementById('jornada-reloj');
-    if (!el || !el.isConnected) { limpiarIntervalos(); return; }
-    el.textContent = new Date().toLocaleTimeString('es-AR', { timeZone: ZONA_OPERATIVA, hour: '2-digit', minute: '2-digit' });
+  //
+  // Corrección (bug real reportado por Claudy, BIT-61): esta función solo
+  // refrescaba la hora -- la fecha visible de "Registro de Jornada" se
+  // escribía UNA SOLA VEZ al renderizar (nowParts().fecha, fuera de
+  // cualquier intervalo) y quedaba congelada si la pantalla seguía
+  // abierta al cruzar medianoche: el reloj seguía avanzando bien, pero la
+  // fecha mostraba el día anterior. Se unifica en el mismo tick de 1s que
+  // ya existía (sin agregar un segundo timer) y con la misma fuente única
+  // ya aprobada (nowParts() / ZONA_OPERATIVA) -- nunca una segunda lógica
+  // de fecha/hora. No toca `renderActiva()`/`renderResumen()`: ahí la
+  // fecha mostrada es la de la Jornada ya creada (dato histórico), no la
+  // de "hoy", y no debe cambiar sola.
+  function actualizarRelojYFecha() {
+    const elReloj = document.getElementById('jornada-reloj');
+    if (!elReloj || !elReloj.isConnected) { limpiarIntervalos(); return; }
+    elReloj.textContent = new Date().toLocaleTimeString('es-AR', { timeZone: ZONA_OPERATIVA, hour: '2-digit', minute: '2-digit' });
+
+    const elFecha = document.getElementById('jornada-fecha');
+    if (elFecha) elFecha.textContent = fmtFecha(nowParts().fecha);
   }
 
   function actualizarDuracion() {
@@ -155,7 +170,7 @@ export async function mountJornadaOperativa(contenedor, ctx) {
     contenedor.innerHTML = `
       <div class="rodeo-card rodeo-jornada-operativa">
         <h2>Registro de Jornada</h2>
-        <p class="rodeo-jornada-fecha">${fmtFecha(nowParts().fecha)}</p>
+        <p class="rodeo-jornada-fecha" id="jornada-fecha">${fmtFecha(nowParts().fecha)}</p>
         <p class="rodeo-jornada-establecimiento">📍 ${escapeHtml(nombreEstablecimientoActivo)}</p>
         <p class="rodeo-jornada-reloj" id="jornada-reloj"></p>
         <div id="jornada-error" class="rodeo-error"></div>
@@ -164,8 +179,8 @@ export async function mountJornadaOperativa(contenedor, ctx) {
         <a href="#jornadas/historial" class="rodeo-link-btn" style="margin-left:0">Ver historial de jornadas</a>
       </div>`;
 
-    actualizarReloj();
-    intervaloReloj = setInterval(actualizarReloj, 1000);
+    actualizarRelojYFecha();
+    intervaloReloj = setInterval(actualizarRelojYFecha, 1000);
 
     document.getElementById('btn-llegada').addEventListener('click', async (e) => {
       const btn = e.currentTarget;
