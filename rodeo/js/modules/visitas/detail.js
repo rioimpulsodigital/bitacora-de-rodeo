@@ -61,8 +61,6 @@ export async function mountVisitaDetail(contenedor, ctx, id) {
       <div class="rodeo-ficha-grid">
         ${campo('Fecha', visita.fecha)}
         ${campo('Tipo', LABEL_TIPO[visita.tipo] ?? visita.tipo)}
-        ${campo('Hora de inicio', visita.hora_inicio?.slice(0, 5))}
-        ${campo('Hora de fin', visita.hora_fin?.slice(0, 5))}
         ${campo('Estado', LABEL_ESTADO[visita.estado] ?? visita.estado)}
         ${campo('Establecimiento', visita.establecimientos?.nombre)}
         ${esSanitaria ? campo('Lote', visita.lotes?.nombre, { vacio: 'Sin lote' }) : ''}

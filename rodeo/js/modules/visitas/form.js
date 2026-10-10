@@ -13,6 +13,19 @@ const LABEL_TIPO_OPT = {
 
 const CATEGORIAS = ['Vaca', 'Vaquilla', 'Ternero', 'Ternera', 'Novillo', 'Novillito', 'Toro', 'Otro'];
 
+// Mismo bug corregido en jornadas/operativa.js y jornadas/form.js (BIT-61):
+// toISOString() da la fecha en UTC, no en Argentina. Encontrado acá de
+// paso mientras se tocaba este archivo para BIT-63 -- mismo criterio,
+// fecha explícita en America/Argentina/Buenos_Aires.
+function fechaHoyArgentina() {
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const valor = (tipo) => partes.find((p) => p.type === tipo).value;
+  return `${valor('year')}-${valor('month')}-${valor('day')}`;
+}
+
 export async function mountVisitaForm(contenedor, ctx, id) {
   contenedor.innerHTML = '<p class="rodeo-loading">Cargando…</p>';
 
@@ -40,7 +53,7 @@ export async function mountVisitaForm(contenedor, ctx, id) {
     return;
   }
 
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = fechaHoyArgentina();
 
   const tipoOpts = TIPOS.map(
     (t) => `<option value="${t}" ${(visita?.tipo ?? 'programada') === t ? 'selected' : ''}>${LABEL_TIPO_OPT[t]}</option>`
@@ -77,12 +90,6 @@ export async function mountVisitaForm(contenedor, ctx, id) {
         <select class="form-field" name="tipo" required>
           ${tipoOpts}
         </select>
-
-        <label class="form-label">Hora de inicio (opcional)</label>
-        <input class="form-field" type="time" name="hora_inicio" value="${visita?.hora_inicio?.slice(0, 5) ?? ''}">
-
-        <label class="form-label">Hora de fin (opcional)</label>
-        <input class="form-field" type="time" name="hora_fin" value="${visita?.hora_fin?.slice(0, 5) ?? ''}">
 
         ${visita ? `
         <label class="form-label">Estado</label>
@@ -170,8 +177,6 @@ export async function mountVisitaForm(contenedor, ctx, id) {
       fecha: fd.get('fecha'),
       tipo: fd.get('tipo'),
       establecimiento_id: visita?.establecimiento_id ?? activoId,
-      hora_inicio: fd.get('hora_inicio'),
-      hora_fin: fd.get('hora_fin'),
       estado: fd.get('estado') ?? 'abierta',
       notas: fd.get('notas'),
       lote_id: esSanitaria ? fd.get('lote_id') : null,

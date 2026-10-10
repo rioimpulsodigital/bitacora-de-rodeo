@@ -13,6 +13,7 @@ const LABEL_TIPO = {
   seguimiento: 'Seguimiento',
   emergencia: 'Emergencia',
   control: 'Control',
+  sanitaria: 'Sanitaria',
   otro: 'Otro',
 };
 
@@ -46,13 +47,20 @@ export async function mountObservacionForm(contenedor, ctx, id) {
     return;
   }
 
-  const visitaSeleccionada = observacion?.visita_id ?? visitas[0]?.id ?? '';
+  const visitaSeleccionada = observacion?.visita_id ?? '';
   const animalSeleccionado = observacion?.animal_id ?? '';
 
-  const visitaOpts = visitas.map((v) => {
-    const label = `${formatFecha(v.fecha)} — ${LABEL_TIPO[v.tipo] ?? v.tipo} (${v.estado === 'abierta' ? 'Abierta' : 'Cerrada'})`;
-    return `<option value="${v.id}" ${visitaSeleccionada === v.id ? 'selected' : ''}>${escapeHtml(label)}</option>`;
-  }).join('');
+  // BIT-63: Visita pasó a ser un dato OPCIONAL de contexto, no un
+  // requisito -- "— Sin visita —" es la opción por defecto, igual que ya
+  // hace Novedades con el mismo selector. La ausencia de Visitas en el
+  // establecimiento ya NO es un error ni bloquea Guardar.
+  const visitaOpts = [
+    `<option value="" ${!visitaSeleccionada ? 'selected' : ''}>— Sin visita —</option>`,
+    ...visitas.map((v) => {
+      const label = `${formatFecha(v.fecha)} — ${LABEL_TIPO[v.tipo] ?? v.tipo} (${v.estado === 'abierta' ? 'Abierta' : 'Cerrada'})`;
+      return `<option value="${v.id}" ${visitaSeleccionada === v.id ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+    }),
+  ].join('');
 
   const animalOpts = [
     `<option value="" ${!animalSeleccionado ? 'selected' : ''}>— Sin sujeto —</option>`,
@@ -64,22 +72,19 @@ export async function mountObservacionForm(contenedor, ctx, id) {
       <h2>${observacion ? 'Editar Observación de Campo' : 'Nueva Observación de Campo'}</h2>
       <form id="rodeo-observacion-form">
 
-        <label class="form-label">Visita <span class="rodeo-required">*</span></label>
-        ${visitas.length === 0
-          ? '<p class="rodeo-error">No hay visitas disponibles para este establecimiento.</p>'
-          : `<select class="form-field" name="visita_id" required>${visitaOpts}</select>`
-        }
-
         <label class="form-label">Descripción <span class="rodeo-required">*</span></label>
-        <textarea class="act-textarea" name="descripcion" rows="4" required>${observacion ? escapeHtml(observacion.descripcion) : ''}</textarea>
+        <textarea class="form-field act-textarea" name="descripcion" rows="4" required>${observacion ? escapeHtml(observacion.descripcion) : ''}</textarea>
 
         <label class="form-label">Paciente Animal (opcional)</label>
         <select class="form-field" name="animal_id">${animalOpts}</select>
 
+        <label class="form-label">Visita relacionada (opcional)</label>
+        <select class="form-field" name="visita_id">${visitaOpts}</select>
+
         <div id="rodeo-form-error" class="rodeo-error"></div>
 
         <div class="rodeo-form-acciones">
-          <button type="submit" class="salida-btn"${visitas.length === 0 ? ' disabled' : ''}>Guardar</button>
+          <button type="submit" class="salida-btn">Guardar</button>
           <a href="#observaciones" class="rodeo-link-btn">Volver al listado</a>
         </div>
       </form>
@@ -92,12 +97,12 @@ export async function mountObservacionForm(contenedor, ctx, id) {
     errorEl.textContent = '';
 
     const campos = {
-      visita_id: fd.get('visita_id'),
+      establecimiento_id: activoId,
+      visita_id: fd.get('visita_id') || null,
       descripcion: fd.get('descripcion') ?? '',
       animal_id: fd.get('animal_id') || null,
     };
 
-    if (!campos.visita_id) { errorEl.textContent = 'Debe seleccionar una visita.'; return; }
     if (!campos.descripcion.trim()) { errorEl.textContent = 'La descripción es obligatoria.'; return; }
 
     try {

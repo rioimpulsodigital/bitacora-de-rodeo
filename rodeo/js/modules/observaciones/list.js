@@ -2,10 +2,18 @@ import { listObservaciones } from './services.js';
 import { escapeHtml } from '../../dashboard.js';
 import { etiquetaPaciente } from '../../services/paciente-label.js';
 
-function formatFecha(str) {
-  if (!str) return '—';
-  const [y, m, d] = str.split('-');
-  return `${d}/${m}/${y}`;
+// BIT-63: Observación ya no tiene fecha propia -- se muestra la fecha de
+// creación (`created_at`, timestamptz) convertida al día calendario de
+// Argentina, con la misma zona explícita ya validada en BIT-61 -- nunca
+// `toISOString()`/zona del dispositivo, para no reintroducir ese bug.
+function formatFechaCreacion(createdAt) {
+  if (!createdAt) return '—';
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date(createdAt));
+  const valor = (tipo) => partes.find((p) => p.type === tipo).value;
+  return `${valor('day')}/${valor('month')}/${valor('year')}`;
 }
 
 function truncar(texto, max = 80) {
@@ -26,8 +34,8 @@ export async function mountObservacionesList(contenedor, ctx) {
 
   const filas = observaciones.map((o) => `
     <tr>
-      <td>${formatFecha(o.visitas?.fecha)}</td>
-      <td>${escapeHtml(o.visitas?.establecimientos?.nombre ?? '—')}</td>
+      <td>${formatFechaCreacion(o.created_at)}</td>
+      <td>${escapeHtml(o.establecimientos?.nombre ?? '—')}</td>
       <td>${escapeHtml(truncar(o.descripcion))}</td>
       <td>${escapeHtml(o.animales ? etiquetaPaciente(o.animales) : '—')}</td>
       <td class="rodeo-table-acciones">
@@ -45,7 +53,7 @@ export async function mountObservacionesList(contenedor, ctx) {
       ${observaciones.length === 0
         ? '<p>No hay observaciones registradas todavía.</p>'
         : `<table class="rodeo-table">
-             <thead><tr><th>Fecha visita</th><th>Establecimiento</th><th>Descripción</th><th>Paciente Animal</th><th></th></tr></thead>
+             <thead><tr><th>Fecha</th><th>Establecimiento</th><th>Descripción</th><th>Paciente Animal</th><th></th></tr></thead>
              <tbody>${filas}</tbody>
            </table>`
       }
