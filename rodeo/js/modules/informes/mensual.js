@@ -5,7 +5,7 @@
 // ninguna Jornada.
 
 import { obtenerActividad, establecimientosConActividad, construirInforme } from './services.js';
-import { renderInforme } from './render.js';
+import { renderInformeMensual } from './render.js';
 import { escapeHtml } from '../../dashboard.js';
 import { hoyLocal, primerDiaDelMes, ultimoDiaDelMes } from '../../services/fecha-argentina.js';
 
@@ -86,7 +86,7 @@ export async function mountInformeMensual(contenedor, ctx) {
     document.getElementById('informe-generar').addEventListener('click', () => {
       const seleccionados = [...resultadoEl.querySelectorAll('.informe-est-check:checked')].map((c) => c.value);
       const informe = construirInforme(actividad, seleccionados, ctx.establecimientos, ctx.perfil, desde, hasta);
-      document.getElementById('informe-render').innerHTML = renderInforme(informe);
+      document.getElementById('informe-render').innerHTML = renderInformeMensual(informe);
     });
   }
 

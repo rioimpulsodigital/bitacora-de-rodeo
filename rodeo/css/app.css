@@ -236,6 +236,14 @@
 .rodeo-informe-lista li { font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
 .rodeo-informe-lista li:last-child { border-bottom: none; padding-bottom: 0; }
 
+/* Informe Mensual: tabla "por fecha" + detalle colapsable (BIT-12 --
+   complementación del consolidado mensual). */
+.rodeo-informe-tabla-fecha { margin-bottom: 4px; }
+.rodeo-informe-tabla-fecha th, .rodeo-informe-tabla-fecha td { text-align: center; padding: 6px 8px; }
+.rodeo-informe-tabla-fecha th:first-child, .rodeo-informe-tabla-fecha td:first-child { text-align: left; }
+.rodeo-informe-detalle { margin-top: 14px; }
+.rodeo-informe-detalle summary { cursor: pointer; font-size: 13px; color: var(--muted); font-weight: 600; }
+
 /* Catastro Equino (BIT-50) — alta rápida en terreno, mobile-first.
    Reutiliza .form-field / .salida-btn / .rodeo-card del resto de la app;
    esto solo agrega lo específico de esta pantalla (aviso de establecimiento,

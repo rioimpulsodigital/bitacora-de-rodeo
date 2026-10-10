@@ -153,6 +153,51 @@ function pacientesRelacionados(datosEstablecimiento) {
   return [...mapa.values()].map((v) => ({ animal: v.animal, origenes: [...v.origenes] }));
 }
 
+const CAMPO_TOTAL_POR_FUENTE = {
+  jornadas: 'totalJornadas',
+  visitas: 'totalVisitas',
+  atenciones: 'totalAtenciones',
+  observaciones: 'totalObservaciones',
+  novedades: 'totalNovedades',
+};
+
+// Consolidación por fecha DENTRO de un establecimiento (nunca mezclada con
+// otro establecimiento -- se calcula una vez por bloque, sobre los mismos
+// arreglos ya traídos, sin re-consultar nada). Es lo que permite al
+// Informe Mensual mostrar "qué pasó cada día" sin que la pantalla
+// principal sea una concatenación cronológica indiscriminada de todo el
+// mes -- el Diario no la necesita (un solo día) y no la usa. Cada fuente
+// aporta su propia fecha real: `fecha` (columna `date`) para
+// Jornadas/Visitas/Atenciones/Novedades, `diaLocalDe(created_at)` para
+// Observaciones -- mismo criterio ya usado en el resto del servicio,
+// nunca un offset a mano.
+function construirPorFecha(datosEstablecimiento) {
+  const mapa = new Map(); // fecha -> { totalJornadas, ..., totalNovedades }
+  function filaVacia() {
+    return { totalJornadas: 0, totalVisitas: 0, totalAtenciones: 0, totalObservaciones: 0, totalNovedades: 0 };
+  }
+  function agregar(filas, fuente, obtenerFecha) {
+    for (const fila of filas) {
+      const fecha = obtenerFecha(fila);
+      if (!mapa.has(fecha)) mapa.set(fecha, filaVacia());
+      mapa.get(fecha)[CAMPO_TOTAL_POR_FUENTE[fuente]] += 1;
+    }
+  }
+  agregar(datosEstablecimiento.jornadas, 'jornadas', (f) => f.fecha);
+  agregar(datosEstablecimiento.visitas, 'visitas', (f) => f.fecha);
+  agregar(datosEstablecimiento.atenciones, 'atenciones', (f) => f.fecha);
+  agregar(datosEstablecimiento.observaciones, 'observaciones', (f) => diaLocalDe(f.created_at));
+  agregar(datosEstablecimiento.novedades, 'novedades', (f) => f.fecha);
+
+  return [...mapa.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([fecha, totales]) => ({
+      fecha,
+      ...totales,
+      total: totales.totalJornadas + totales.totalVisitas + totales.totalAtenciones + totales.totalObservaciones + totales.totalNovedades,
+    }));
+}
+
 // Construye el Informe final -- SIN consultar nada nuevo. Filtra
 // `actividad` (ya en memoria) a solo los establecimientos que el
 // profesional eligió, preserva la separación estricta por establecimiento
@@ -168,16 +213,17 @@ export function construirInforme(actividad, establecimientosSeleccionados, estab
       // para el Informe Mensual, que puede abarcar varias fechas distintas
       // en la misma lista. Observaciones no tiene `fecha` propia -- se
       // ordena por `created_at`, que es la fuente real de su fecha/hora.
-      const porFecha = (a, b) => (a.fecha ?? '').localeCompare(b.fecha ?? '');
-      const porCreatedAt = (a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? '');
+      const compararPorFecha = (a, b) => (a.fecha ?? '').localeCompare(b.fecha ?? '');
+      const compararPorCreatedAt = (a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? '');
       return {
         establecimiento,
-        jornadas: [...datos.jornadas].sort(porFecha),
-        visitas: [...datos.visitas].sort(porFecha),
-        atenciones: [...datos.atenciones].sort(porFecha),
-        observaciones: [...datos.observaciones].sort(porCreatedAt),
-        novedades: [...datos.novedades].sort(porFecha),
+        jornadas: [...datos.jornadas].sort(compararPorFecha),
+        visitas: [...datos.visitas].sort(compararPorFecha),
+        atenciones: [...datos.atenciones].sort(compararPorFecha),
+        observaciones: [...datos.observaciones].sort(compararPorCreatedAt),
+        novedades: [...datos.novedades].sort(compararPorFecha),
         pacientesRelacionados: pacientesRelacionados(datos),
+        porFecha: construirPorFecha(datos),
         resumen: {
           totalJornadas: datos.jornadas.length,
           totalVisitas: datos.visitas.length,
