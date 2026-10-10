@@ -11,6 +11,18 @@ function formatFecha(str) {
   return `${d}/${m}/${y}`;
 }
 
+// Misma conversión que list.js -- ver esa nota para el porqué de la zona
+// explícita de Argentina en vez de toISOString()/zona del dispositivo.
+function formatFechaCreacion(createdAt) {
+  if (!createdAt) return '—';
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date(createdAt));
+  const valor = (tipo) => partes.find((p) => p.type === tipo).value;
+  return `${valor('day')}/${valor('month')}/${valor('year')}`;
+}
+
 function campo(etiqueta, valor, { vacio = 'No informado' } = {}) {
   const hayValor = valor !== null && valor !== undefined && String(valor).trim() !== '';
   return `
@@ -43,8 +55,10 @@ export async function mountObservacionDetail(contenedor, ctx, id) {
       </div>
 
       <div class="rodeo-ficha-grid">
-        ${campo('Fecha de la visita', formatFecha(observacion.visitas?.fecha))}
+        ${campo('Fecha', formatFechaCreacion(observacion.created_at))}
+        ${campo('Establecimiento', observacion.establecimientos?.nombre)}
         ${campo('Paciente Animal', observacion.animales ? etiquetaPaciente(observacion.animales) : null, { vacio: 'Sin sujeto asociado' })}
+        ${campo('Visita relacionada', observacion.visitas ? `${formatFecha(observacion.visitas.fecha)} — ${observacion.visitas.tipo ?? ''}` : null, { vacio: 'Sin visita asociada' })}
       </div>
       <div class="rodeo-ficha-campo"><span class="form-label">Descripción</span><div style="white-space:pre-wrap">${escapeHtml(observacion.descripcion)}</div></div>
 

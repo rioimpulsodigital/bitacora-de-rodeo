@@ -1,9 +1,15 @@
 import { supabase } from '../../../../js/core/supabase-client.js';
 
+// BIT-63: `hora_inicio`/`hora_fin` se retiraron del flujo -- el control
+// horario pertenece a Jornada (BIT-61), no a cada Visita. Las columnas
+// siguen existiendo en la base (no se eliminan, sin uso confirmado fuera
+// de este módulo -- ver migration-BIT-63-observaciones-visitas.sql) pero
+// ya no se seleccionan ni se envían desde acá.
+
 export async function listVisitas(establecimientoId) {
   let q = supabase
     .from('visitas')
-    .select('id, fecha, tipo, hora_inicio, hora_fin, estado, notas, establecimiento_id, establecimientos(nombre)');
+    .select('id, fecha, tipo, estado, notas, establecimiento_id, establecimientos(nombre)');
   if (establecimientoId) q = q.eq('establecimiento_id', establecimientoId);
   const { data, error } = await q.order('fecha', { ascending: false });
   if (error) throw error;
@@ -13,7 +19,7 @@ export async function listVisitas(establecimientoId) {
 export async function getVisita(id) {
   const { data, error } = await supabase
     .from('visitas')
-    .select('id, fecha, tipo, hora_inicio, hora_fin, estado, notas, establecimiento_id, jornada_id, lote_id, alcance, categoria, acciones_realizadas, establecimientos(id, nombre), lotes(id, nombre)')
+    .select('id, fecha, tipo, estado, notas, establecimiento_id, jornada_id, lote_id, alcance, categoria, acciones_realizadas, establecimientos(id, nombre), lotes(id, nombre)')
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;
@@ -38,8 +44,6 @@ export async function crearVisita(campos) {
       establecimiento_id: campos.establecimiento_id,
       fecha: campos.fecha,
       tipo: campos.tipo,
-      hora_inicio: campos.hora_inicio || null,
-      hora_fin: campos.hora_fin || null,
       estado: 'abierta',
       notas: campos.notas?.trim() || null,
       lote_id: campos.lote_id || null,
@@ -60,8 +64,6 @@ export async function actualizarVisita(id, campos) {
       establecimiento_id: campos.establecimiento_id,
       fecha: campos.fecha,
       tipo: campos.tipo,
-      hora_inicio: campos.hora_inicio || null,
-      hora_fin: campos.hora_fin || null,
       estado: campos.estado,
       notas: campos.notas?.trim() || null,
       lote_id: campos.lote_id || null,

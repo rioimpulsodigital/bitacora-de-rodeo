@@ -37,8 +37,6 @@ export async function mountVisitasList(contenedor, ctx) {
       <td>${formatFecha(v.fecha)}</td>
       <td>${escapeHtml(v.establecimientos?.nombre ?? '—')}</td>
       <td>${LABEL_TIPO[v.tipo] ?? '—'}</td>
-      <td>${v.hora_inicio ? v.hora_inicio.slice(0, 5) : '—'}</td>
-      <td>${v.hora_fin ? v.hora_fin.slice(0, 5) : '—'}</td>
       <td>${BADGE_ESTADO[v.estado] ?? escapeHtml(v.estado)}</td>
       <td class="rodeo-table-acciones">
         <a href="#visitas/ver/${v.id}">Ver</a>
@@ -55,7 +53,7 @@ export async function mountVisitasList(contenedor, ctx) {
       ${visitas.length === 0
         ? '<p>No hay visitas registradas todavía.</p>'
         : `<table class="rodeo-table">
-             <thead><tr><th>Fecha</th><th>Establecimiento</th><th>Tipo</th><th>Inicio</th><th>Fin</th><th>Estado</th><th></th></tr></thead>
+             <thead><tr><th>Fecha</th><th>Establecimiento</th><th>Tipo</th><th>Estado</th><th></th></tr></thead>
              <tbody>${filas}</tbody>
            </table>`
       }
