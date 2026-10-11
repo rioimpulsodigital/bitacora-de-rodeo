@@ -244,6 +244,33 @@
 .rodeo-informe-detalle { margin-top: 14px; }
 .rodeo-informe-detalle summary { cursor: pointer; font-size: 13px; color: var(--muted); font-weight: 600; }
 
+/* Ajustes de validación con Claudy (~390px): 3 hallazgos puntuales,
+   acotados solo a elementos de Informes -- no se toca el `.rodeo-card-
+   header`/`.rodeo-link-btn` genéricos que usa el resto de la app. */
+
+/* 1) Tabla "Actividad por fecha": scroll horizontal PROPIO en vez de
+   desbordar la tarjeta. La página nunca gana scroll horizontal -- queda
+   confinado a este contenedor; las 7 columnas siguen accesibles
+   deslizando en vez de comprimirse hasta ser ilegibles. */
+.rodeo-informe-tabla-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -2px; }
+.rodeo-informe-tabla-fecha { min-width: 480px; }
+
+/* 2) Cabecera del bloque de establecimiento: el nombre no debe
+   comprimirse por compartir la fila con el resumen de totales -- en
+   pantallas angostas el resumen pasa a su propia línea. */
+.rodeo-informe-bloque .rodeo-card-header { flex-wrap: wrap; gap: 4px 12px; }
+.rodeo-informe-bloque .rodeo-card-header h3 { flex: 1 1 auto; min-width: 180px; margin: 0; }
+.rodeo-informe-bloque .rodeo-card-header .rodeo-hint { flex: 1 1 100%; margin: 0; }
+
+/* 3) "Todos"/"Ninguno": mismo estilo visual secundario (texto
+   subrayado, sin convertirse en la acción principal frente a "Generar
+   informe"), pero con área táctil cómoda -- `.rodeo-link-btn` solo no
+   tiene padding. */
+.rodeo-informe-btn-secundario {
+  display: inline-flex; align-items: center; min-height: 40px;
+  padding: 8px 10px; margin-left: 4px;
+}
+
 /* Catastro Equino (BIT-50) — alta rápida en terreno, mobile-first.
    Reutiliza .form-field / .salida-btn / .rodeo-card del resto de la app;
    esto solo agrega lo específico de esta pantalla (aviso de establecimiento,

@@ -19,7 +19,7 @@
 // persona por un descuido de confiar solo en RLS.
 
 import { supabase } from '../../../../js/core/supabase-client.js';
-import { diaLocalDe } from '../../services/fecha-argentina.js';
+import { diaLocalDe, diaSiguiente } from '../../services/fecha-argentina.js';
 
 // ── Una consulta por fuente, cada una con su propia columna real de
 // autoría/fecha/establecimiento (confirmadas en código -- Jornadas BIT-61,
@@ -68,22 +68,27 @@ function toDateOnly(value) {
   return value ? String(value).split('T')[0] : value;
 }
 
-// El filtro .gte()/.lte() de abajo sigue siendo correcto tal cual, aunque
-// `fecha` sea `timestamptz`: como todo valor histórico (y todo valor
-// nuevo, porque el formulario sigue guardando el mismo 'YYYY-MM-DD' de
-// siempre) queda a las 00:00 UTC de su día de negocio, comparar contra
-// los límites `desde`/`hasta` (también interpretados como medianoche UTC
-// por Postgres) incluye correctamente el primer y el último día del
-// rango -- el problema real nunca estuvo en el filtro de la consulta,
-// sino en reusar el valor crudo devuelto para ordenar/agrupar/mostrar
-// (ver toDateOnly() arriba).
+// Límite superior EXCLUSIVO (corrección, ronda de validación con Claudy):
+// un `.lte('fecha', hasta)` simple compara contra la medianoche UTC de
+// `hasta` -- hoy todos los valores reales están exactamente a esa hora
+// (por eso la validación funcional pasó), pero BIT-12 no debe depender
+// de que TODO timestamp futuro de `atenciones_clinicas.fecha` siga
+// siendo exactamente `00:00`. `.lt('fecha', diaSiguiente(hasta))`
+// expresa la semántica real que se busca -- "la fecha de negocio es
+// `hasta`, sin importar la hora que tenga esa fila" -- como un rango
+// semiabierto `[desde, diaSiguiente(hasta))`, correcto para cualquier
+// hora dentro del día `hasta` y sin incluir nada del día siguiente.
+// `diaSiguiente()` es aritmética de calendario pura (ver
+// services/fecha-argentina.js) -- no es una conversión de instante, no
+// usa `diaLocalDe()`, no le cambia nada a la semántica ya aprobada de
+// esta columna (fecha de negocio, nunca un instante de Argentina).
 async function filasAtenciones(profesionalId, desde, hasta) {
   const { data, error } = await supabase
     .from('atenciones_clinicas')
     .select('id, fecha, motivo, diagnostico, estado, establecimiento_id, animal_id, animales(id, nombre, numero_identificacion, especie)')
     .eq('profesional_responsable_id', profesionalId)
     .gte('fecha', desde)
-    .lte('fecha', hasta);
+    .lt('fecha', diaSiguiente(hasta));
   if (error) throw error;
   return data.map((fila) => ({ ...fila, fecha: toDateOnly(fila.fecha) }));
 }

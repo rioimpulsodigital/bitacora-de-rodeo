@@ -62,8 +62,8 @@ export async function mountInformeDiario(contenedor, ctx) {
         ${opciones}
       </div>
       <div class="rodeo-form-acciones">
-        <button type="button" class="rodeo-link-btn" id="informe-todos" style="margin-left:0">Todos</button>
-        <button type="button" class="rodeo-link-btn" id="informe-ninguno">Ninguno</button>
+        <button type="button" class="rodeo-link-btn rodeo-informe-btn-secundario" id="informe-todos" style="margin-left:0">Todos</button>
+        <button type="button" class="rodeo-link-btn rodeo-informe-btn-secundario" id="informe-ninguno">Ninguno</button>
         <button type="button" class="salida-btn" id="informe-generar">Generar informe</button>
       </div>
       <div id="informe-render" style="margin-top:16px"></div>`;

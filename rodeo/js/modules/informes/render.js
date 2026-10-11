@@ -89,13 +89,20 @@ function renderPorFecha(bloque) {
       <td>${dia.totalNovedades || '—'}</td>
       <td><strong>${dia.total}</strong></td>
     </tr>`).join('');
+  // Envuelta en un contenedor con scroll horizontal PROPIO (hallazgo de
+  // Claudy: en ~390px la tabla sobresalía del borde de la tarjeta). El
+  // scroll queda confinado a este contenedor -- nunca a la página
+  // completa -- y las 7 columnas siguen accesibles deslizando, en vez de
+  // comprimirse hasta ser ilegibles.
   return `
     <div class="rodeo-informe-seccion">
       <h4>Actividad por fecha</h4>
-      <table class="rodeo-table rodeo-informe-tabla-fecha">
-        <thead><tr><th>Fecha</th><th>${LABEL_FUENTE_CORTA.totalJornadas}</th><th>${LABEL_FUENTE_CORTA.totalVisitas}</th><th>${LABEL_FUENTE_CORTA.totalAtenciones}</th><th>${LABEL_FUENTE_CORTA.totalObservaciones}</th><th>${LABEL_FUENTE_CORTA.totalNovedades}</th><th>Total</th></tr></thead>
-        <tbody>${filas}</tbody>
-      </table>
+      <div class="rodeo-informe-tabla-scroll">
+        <table class="rodeo-table rodeo-informe-tabla-fecha">
+          <thead><tr><th>Fecha</th><th>${LABEL_FUENTE_CORTA.totalJornadas}</th><th>${LABEL_FUENTE_CORTA.totalVisitas}</th><th>${LABEL_FUENTE_CORTA.totalAtenciones}</th><th>${LABEL_FUENTE_CORTA.totalObservaciones}</th><th>${LABEL_FUENTE_CORTA.totalNovedades}</th><th>Total</th></tr></thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
     </div>`;
 }
 

@@ -51,3 +51,19 @@ export function ultimoDiaDelMes(anioMes) {
 export function primerDiaDelMes(anioMes) {
   return `${anioMes}-01`;
 }
+
+// Día calendario siguiente a una fecha 'YYYY-MM-DD' -- mismo criterio de
+// aritmética pura de calendario que `ultimoDiaDelMes()` (getters LOCALES
+// del propio Date, nunca UTC, maneja el cambio de mes/año automáticamente
+// vía el desborde normal de `new Date(a, m, d)`). Sirve para construir un
+// límite superior EXCLUSIVO `[desde, diaSiguiente(hasta))` al filtrar una
+// columna `timestamptz` que representa una fecha de negocio (hoy:
+// atenciones_clinicas.fecha) -- un `.lte(hasta)` simple compara contra la
+// medianoche de `hasta` y excluiría cualquier fila de ese mismo día con
+// una hora posterior a las 00:00, sin que eso tenga nada que ver con a
+// qué día de negocio pertenece la fila.
+export function diaSiguiente(fechaIso) {
+  const [anio, mes, dia] = fechaIso.split('-').map(Number);
+  const d = new Date(anio, mes - 1, dia + 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
