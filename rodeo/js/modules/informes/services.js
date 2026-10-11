@@ -48,6 +48,35 @@ async function filasVisitas(profesionalId, desde, hasta) {
   return data;
 }
 
+// `atenciones_clinicas.fecha` es `timestamptz` en Producción (confirmado
+// por Claudy), NO `date` -- a diferencia de Jornadas/Visitas/Novedades.
+// Los valores históricos están guardados a las 00:00 UTC, y el módulo
+// Atenciones YA trata esta columna como una fecha de negocio (día elegido
+// por la usuaria en un <input type="date">), no como un instante real --
+// `crearAtencion()`/`actualizarAtencion()` guardan `campos.fecha` tal cual
+// viene del input, y el propio `atenciones/form.js` la vuelve a leer con
+// `toDateOnly()` (`String(value).split('T')[0]`) para mostrarla y para
+// repoblarla al editar. Por eso NO se usa `diaLocalDe()` acá -- eso
+// reinterpretaría el instante como America/Argentina/Buenos_Aires y
+// correría una Atención de `2026-09-14T00:00:00+00:00` al `2026-09-13`
+// (21:00 ART del día anterior), exactamente el error que hay que evitar.
+// Se normaliza al mismo formato 'YYYY-MM-DD' que ya usan las demás
+// fuentes, UNA SOLA VEZ, apenas entra al agregador -- nada río abajo
+// (orden, agrupación por fecha, renderizado) necesita saber que esta
+// columna es distinta.
+function toDateOnly(value) {
+  return value ? String(value).split('T')[0] : value;
+}
+
+// El filtro .gte()/.lte() de abajo sigue siendo correcto tal cual, aunque
+// `fecha` sea `timestamptz`: como todo valor histórico (y todo valor
+// nuevo, porque el formulario sigue guardando el mismo 'YYYY-MM-DD' de
+// siempre) queda a las 00:00 UTC de su día de negocio, comparar contra
+// los límites `desde`/`hasta` (también interpretados como medianoche UTC
+// por Postgres) incluye correctamente el primer y el último día del
+// rango -- el problema real nunca estuvo en el filtro de la consulta,
+// sino en reusar el valor crudo devuelto para ordenar/agrupar/mostrar
+// (ver toDateOnly() arriba).
 async function filasAtenciones(profesionalId, desde, hasta) {
   const { data, error } = await supabase
     .from('atenciones_clinicas')
@@ -56,7 +85,7 @@ async function filasAtenciones(profesionalId, desde, hasta) {
     .gte('fecha', desde)
     .lte('fecha', hasta);
   if (error) throw error;
-  return data;
+  return data.map((fila) => ({ ...fila, fecha: toDateOnly(fila.fecha) }));
 }
 
 async function filasNovedades(profesionalId, desde, hasta) {
