@@ -40,15 +40,18 @@ async function copiarAlPortapapeles(texto) {
   }
 }
 
-// BIT-17: enlace oficial de WhatsApp ("Click to Chat") sin número fijo --
-// `api.whatsapp.com/send?text=...` abre WhatsApp (app en el teléfono vía
-// intercepción del link, o WhatsApp Web en escritorio) con el texto
-// precargado y deja que la persona elija el contacto/chat desde ahí.
-// Nunca se guarda ni se fuerza un número -- ninguna API de WhatsApp
-// Business, ningún servicio de terceros, es el mismo dominio oficial que
-// ya usa cualquier botón "Compartir en WhatsApp" de la web.
+// BIT-17 (ajuste 02, hallazgo de KLIAM): enlace oficial de WhatsApp
+// ("Click to Chat") sin número fijo -- `wa.me/?text=...` es el dominio
+// y formato que documenta vigente la propia WhatsApp FAQ para compartir
+// un mensaje precompletado SIN destinatario (a diferencia de
+// `wa.me/<numero>?text=...`, que sí fija un número). Abre WhatsApp (app
+// en el teléfono vía intercepción del link, o WhatsApp Web en
+// escritorio) con el texto precargado y muestra la lista de contactos
+// para elegir con quién compartirlo -- nunca se guarda ni se fuerza un
+// número, ninguna API de WhatsApp Business, ningún servicio de
+// terceros.
 function urlCompartirWhatsapp(texto) {
-  return `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
+  return `https://wa.me/?text=${encodeURIComponent(texto)}`;
 }
 
 // Solo se montan cuando el Informe tiene algo para mostrar -- copiar o
