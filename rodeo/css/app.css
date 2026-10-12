@@ -300,14 +300,17 @@
   padding: 8px 10px; margin-left: 4px;
 }
 
-/* BIT-16: acción "Copiar informe" -- vive arriba del todo del Informe
-   Diario ya generado, con el feedback de "Copiado ✓" al lado (nunca un
-   modal ni un alert) para no interrumpir la lectura. */
+/* BIT-16/BIT-17: acciones "Copiar informe" y "Enviar por WhatsApp" --
+   viven arriba del todo del Informe Diario ya generado, con el feedback
+   de "Copiado ✓" al lado (nunca un modal ni un alert) para no
+   interrumpir la lectura. flex-wrap: en mobile angosto los 2 botones +
+   el feedback pueden pasar a una segunda línea sin generar overflow. */
 .rodeo-informe-acciones-texto {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   margin-bottom: 16px;
 }
-.rodeo-informe-acciones-texto #informe-copiar {
+.rodeo-informe-acciones-texto #informe-copiar,
+.rodeo-informe-acciones-texto #informe-whatsapp {
   padding: 8px 14px; margin-left: 0;
 }
 
