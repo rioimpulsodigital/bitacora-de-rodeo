@@ -300,6 +300,17 @@
   padding: 8px 10px; margin-left: 4px;
 }
 
+/* BIT-16: acción "Copiar informe" -- vive arriba del todo del Informe
+   Diario ya generado, con el feedback de "Copiado ✓" al lado (nunca un
+   modal ni un alert) para no interrumpir la lectura. */
+.rodeo-informe-acciones-texto {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.rodeo-informe-acciones-texto #informe-copiar {
+  padding: 8px 14px; margin-left: 0;
+}
+
 /* Catastro Equino (BIT-50) — alta rápida en terreno, mobile-first.
    Reutiliza .form-field / .salida-btn / .rodeo-card del resto de la app;
    esto solo agrega lo específico de esta pantalla (aviso de establecimiento,
