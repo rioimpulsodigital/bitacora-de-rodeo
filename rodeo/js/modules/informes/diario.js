@@ -40,10 +40,24 @@ async function copiarAlPortapapeles(texto) {
   }
 }
 
-// Solo se monta cuando el Informe tiene algo para mostrar -- copiar "Sin
-// actividad registrada..." no aporta nada y el botón no debe aparecer
-// sin un informe real generado.
-function montarAccionCopiar(contenedor, informe) {
+// BIT-17: enlace oficial de WhatsApp ("Click to Chat") sin número fijo --
+// `api.whatsapp.com/send?text=...` abre WhatsApp (app en el teléfono vía
+// intercepción del link, o WhatsApp Web en escritorio) con el texto
+// precargado y deja que la persona elija el contacto/chat desde ahí.
+// Nunca se guarda ni se fuerza un número -- ninguna API de WhatsApp
+// Business, ningún servicio de terceros, es el mismo dominio oficial que
+// ya usa cualquier botón "Compartir en WhatsApp" de la web.
+function urlCompartirWhatsapp(texto) {
+  return `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
+}
+
+// Solo se montan cuando el Informe tiene algo para mostrar -- copiar o
+// compartir "Sin actividad registrada..." no aporta nada y ninguna de
+// las dos acciones debe aparecer sin un informe real generado. El texto
+// se construye UNA sola vez (construirTextoInforme, BIT-16) y lo
+// reutilizan ambas acciones -- Copiar y WhatsApp comparten exactamente
+// el mismo contenido, nunca un segundo formateador.
+function montarAcciones(contenedor, informe) {
   if (informe.establecimientos.length === 0) return;
   const texto = construirTextoInforme(informe);
 
@@ -51,6 +65,7 @@ function montarAccionCopiar(contenedor, informe) {
   acciones.className = 'rodeo-informe-acciones-texto';
   acciones.innerHTML = `
     <button type="button" class="rodeo-link-btn rodeo-informe-btn-secundario" id="informe-copiar">📋 Copiar informe</button>
+    <a class="rodeo-link-btn rodeo-informe-btn-secundario" id="informe-whatsapp" href="${urlCompartirWhatsapp(texto)}" target="_blank" rel="noopener">📲 Enviar por WhatsApp</a>
     <span class="rodeo-hint" id="informe-copiar-feedback" role="status" aria-live="polite"></span>`;
   contenedor.prepend(acciones);
 
@@ -135,7 +150,7 @@ export async function mountInformeDiario(contenedor, ctx) {
       const informe = construirInforme(actividad, seleccionados, ctx.establecimientos, ctx.perfil, fecha, fecha);
       const renderEl = document.getElementById('informe-render');
       renderEl.innerHTML = renderInforme(informe);
-      montarAccionCopiar(renderEl, informe);
+      montarAcciones(renderEl, informe);
     });
   }
 
