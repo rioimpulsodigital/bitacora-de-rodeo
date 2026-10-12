@@ -40,18 +40,22 @@ async function copiarAlPortapapeles(texto) {
   }
 }
 
-// BIT-17 (ajuste 02, hallazgo de KLIAM): enlace oficial de WhatsApp
-// ("Click to Chat") sin número fijo -- `wa.me/?text=...` es el dominio
-// y formato que documenta vigente la propia WhatsApp FAQ para compartir
-// un mensaje precompletado SIN destinatario (a diferencia de
-// `wa.me/<numero>?text=...`, que sí fija un número). Abre WhatsApp (app
-// en el teléfono vía intercepción del link, o WhatsApp Web en
-// escritorio) con el texto precargado y muestra la lista de contactos
-// para elegir con quién compartirlo -- nunca se guarda ni se fuerza un
-// número, ninguna API de WhatsApp Business, ningún servicio de
-// terceros.
+// BIT-17 (ajuste 04, hallazgo de Claudy -- comportamiento real por
+// encima de preferencia de documentación): `wa.me/?text=...` es el
+// formato que documenta la WhatsApp FAQ para compartir sin
+// destinatario, pero Claudy reprodujo una pérdida real de 3 emojis
+// concretos (📍🩺🐾) en escritorio durante el redireccionamiento
+// posterior de `wa.me` -- nuestro propio `encodeURIComponent()` ya los
+// codifica correctamente (son UTF-8 válido de 4 bytes, verificado), así
+// que la corrupción ocurre del lado de `wa.me`, no en este código.
+// `api.whatsapp.com/send/?text=...` -- el endpoint anterior a BIT-17-02
+// -- fue el que Claudy verificó que conserva esos mismos emojis también
+// en escritorio. Mismo dominio oficial de WhatsApp (no es la API de
+// WhatsApp Business ni un servicio de terceros), igual sin número de
+// destinatario fijo -- solo cambia cuál de los dos endpoints oficiales
+// de WhatsApp se usa.
 function urlCompartirWhatsapp(texto) {
-  return `https://wa.me/?text=${encodeURIComponent(texto)}`;
+  return `https://api.whatsapp.com/send/?text=${encodeURIComponent(texto)}`;
 }
 
 // Solo se montan cuando el Informe tiene algo para mostrar -- copiar o
