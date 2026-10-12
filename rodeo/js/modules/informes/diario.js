@@ -5,8 +5,64 @@
 
 import { obtenerActividad, establecimientosConActividad, construirInforme } from './services.js';
 import { renderInforme } from './render.js';
+import { construirTextoInforme } from './texto.js';
 import { escapeHtml } from '../../dashboard.js';
 import { hoyLocal } from '../../services/fecha-argentina.js';
+
+// BIT-16: copia el texto del Informe ya generado (construirTextoInforme,
+// mismo objeto Informe que renderInforme) al portapapeles. Clipboard API
+// primero; si no está disponible o el permiso se rechaza (http no
+// seguro, navegador viejo), cae a un textarea oculto + execCommand
+// ('copy') -- si tampoco funciona, devuelve false y la UI lo informa en
+// vez de fallar en silencio.
+async function copiarAlPortapapeles(texto) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(texto);
+      return true;
+    } catch {
+      // sigue al fallback de abajo
+    }
+  }
+  try {
+    const textarea = document.createElement('textarea');
+    textarea.value = texto;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.top = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copiado = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return copiado;
+  } catch {
+    return false;
+  }
+}
+
+// Solo se monta cuando el Informe tiene algo para mostrar -- copiar "Sin
+// actividad registrada..." no aporta nada y el botón no debe aparecer
+// sin un informe real generado.
+function montarAccionCopiar(contenedor, informe) {
+  if (informe.establecimientos.length === 0) return;
+  const texto = construirTextoInforme(informe);
+
+  const acciones = document.createElement('div');
+  acciones.className = 'rodeo-informe-acciones-texto';
+  acciones.innerHTML = `
+    <button type="button" class="rodeo-link-btn rodeo-informe-btn-secundario" id="informe-copiar">📋 Copiar informe</button>
+    <span class="rodeo-hint" id="informe-copiar-feedback" role="status" aria-live="polite"></span>`;
+  contenedor.prepend(acciones);
+
+  document.getElementById('informe-copiar').addEventListener('click', async () => {
+    const feedback = document.getElementById('informe-copiar-feedback');
+    const copiado = await copiarAlPortapapeles(texto);
+    feedback.textContent = copiado
+      ? 'Copiado ✓'
+      : 'No se pudo copiar automáticamente -- seleccioná el texto manualmente.';
+    if (copiado) setTimeout(() => { feedback.textContent = ''; }, 3000);
+  });
+}
 
 function fmtFechaCorta(iso) {
   const [y, m, d] = iso.split('-');
@@ -77,7 +133,9 @@ export async function mountInformeDiario(contenedor, ctx) {
     document.getElementById('informe-generar').addEventListener('click', () => {
       const seleccionados = [...resultadoEl.querySelectorAll('.informe-est-check:checked')].map((c) => c.value);
       const informe = construirInforme(actividad, seleccionados, ctx.establecimientos, ctx.perfil, fecha, fecha);
-      document.getElementById('informe-render').innerHTML = renderInforme(informe);
+      const renderEl = document.getElementById('informe-render');
+      renderEl.innerHTML = renderInforme(informe);
+      montarAccionCopiar(renderEl, informe);
     });
   }
 
