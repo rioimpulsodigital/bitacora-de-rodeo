@@ -44,6 +44,21 @@
 }
 .rodeo-header-volver:hover { background: rgba(255,255,255,0.28); }
 
+/* BIT-12 (corrección de arquitectura global): Informes vive en el
+   contexto global del header, no en el sidebar de establecimiento --
+   mismo lenguaje visual que "Volver a módulos" (pastilla clara sobre el
+   header oscuro), para comunicar que es una función de la persona y no
+   de un establecimiento. */
+.rodeo-header-global { display: flex; align-items: center; }
+.rodeo-header-nav-link {
+  font-family: var(--font-body); font-size: 13px; font-weight: 600;
+  color: #fff; text-decoration: none; white-space: nowrap;
+  background: rgba(255,255,255,0.15);
+  border-radius: 999px; padding: 6px 14px;
+}
+.rodeo-header-nav-link:hover { background: rgba(255,255,255,0.28); }
+.rodeo-header-nav-link.active { background: rgba(255,255,255,0.32); }
+
 /* BIT-58: botón de navegación móvil -- oculto en escritorio por defecto;
    @media (max-width: 768px) más abajo lo muestra y oculta la barra
    horizontal de módulos que usaba ese mismo espacio hasta BIT-57. */
@@ -366,6 +381,10 @@
     padding: 10px 14px;
     gap: 8px 12px;
   }
+  /* BIT-12: fila propia, entre la marca y el establecimiento -- no
+     compite por espacio con "Volver a módulos"/☰ en la primera línea. */
+  .rodeo-header-global { order: 2; flex: 1 1 100%; }
+  .rodeo-header-nav-link { display: inline-flex; align-items: center; min-height: 40px; }
   .rodeo-header-establecimiento { order: 3; flex: 1 1 100%; }
   .rodeo-header-establecimiento select { width: 100%; padding: 10px 14px; font-size: 15px; }
   /* Propia fila -- antes competía por espacio con brand+Volver en la
