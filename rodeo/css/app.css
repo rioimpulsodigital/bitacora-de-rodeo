@@ -433,21 +433,20 @@
   .rodeo-header-nav-link { display: inline-flex; align-items: center; min-height: 40px; }
   .rodeo-menu-toggle { display: flex; order: 3; }
 
-  /* Ajuste de alineación (revisión visual de Bren, BIT-66 -- 03): las 3
-     filas forman un bloque de controles alineado al borde derecho, no
-     centrado ni a lo ancho -- la fila 1 (Informes + ☰) ya quedaba a la
-     derecha por el margin-left:auto de arriba; filas 2 y 3 ahora
-     también terminan en ese mismo borde. */
+  /* Ajuste final de alineación (revisión directa de Bren en teléfono,
+     BIT-66 -- 04): fila 1 sin cambios (marca izquierda, Informes/☰
+     derecha); filas 2 y 3 vuelven a centradas en vez de alineadas al
+     borde derecho. */
   .rodeo-header-user {
     order: 4; flex: 1 1 100%; gap: 8px;
     padding-top: 8px;
     border-top: 1px solid rgba(255,255,255,0.15);
-    justify-content: flex-end;
+    justify-content: center;
   }
 
   .rodeo-header-establecimiento {
     order: 5; flex: 1 1 100%;
-    display: flex; justify-content: flex-end;
+    display: flex; justify-content: center;
   }
   .rodeo-header-establecimiento select { padding: 10px 14px; font-size: 15px; }
 
