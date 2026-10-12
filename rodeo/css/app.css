@@ -406,28 +406,44 @@
     padding: 10px 14px;
     gap: 8px 12px;
   }
-  /* BIT-12 (ajuste final de distribución): mismos dos grupos que en
-     escritorio (navegación/sesión), apilados en vez de lado a lado --
-     .rodeo-header-left ocupa su propia fila completa y se reparte en
-     sub-filas internas; .rodeo-header-right queda debajo, separado por
-     un borde para distinguir claramente el grupo de sesión del de
-     navegación. "Volver a módulos" sigue reubicándose por JS dentro del
-     panel de navegación (ver más abajo) -- en esta fila de marca+☰ solo
-     queda el logo/título. */
-  .rodeo-header-left { flex-wrap: wrap; flex: 1 1 100%; gap: 8px 12px; }
-  .rodeo-header-right {
-    flex: 1 1 100%;
+  /* Ajuste de layout mobile del header (tarea independiente de BIT-12,
+     12 Oct 2026): la agrupación .rodeo-header-left/.rodeo-header-right
+     sigue existiendo para escritorio (Marca→Volver→Establecimiento→
+     Informes a la izquierda, Usuario→Rol→Cerrar sesión a la derecha),
+     pero en mobile esas dos cajas se "aplanan" con `display: contents`
+     -- desaparecen como caja, sus hijos pasan a ser hijos directos de
+     .rodeo-header -- para poder reordenar libremente marca/
+     establecimiento/Informes/☰/usuario en 3 filas, sin que el
+     agrupamiento de escritorio limite qué puede compartir fila con qué
+     en mobile. No cambia la lógica de ningún módulo: son los mismos
+     nodos, con los mismos id (`#rodeo-establecimiento`, etc.) que sigue
+     usando router.js para ocultar/restaurar el selector dentro de
+     Informes.
+     Fila 1: marca (izquierda) -- Informes + ☰ (derecha, mismo bloque).
+     Fila 2: usuario/rol/cerrar sesión, separada por un borde.
+     Fila 3: establecimiento, centrado. */
+  .rodeo-header-left, .rodeo-header-right { display: contents; }
+
+  .rodeo-header-brand { order: 1; }
+
+  /* margin-left:auto empuja Informes (y lo que la sigue en la misma
+     fila, el botón ☰) hasta el borde derecho -- mismo bloque, ☰ queda
+     el más a la derecha de todos. */
+  .rodeo-header-global { order: 2; margin-left: auto; }
+  .rodeo-header-nav-link { display: inline-flex; align-items: center; min-height: 40px; }
+  .rodeo-menu-toggle { display: flex; order: 3; }
+
+  .rodeo-header-user {
+    order: 4; flex: 1 1 100%; gap: 8px;
     padding-top: 8px;
     border-top: 1px solid rgba(255,255,255,0.15);
   }
 
-  .rodeo-menu-toggle { display: flex; order: 1; }
-  .rodeo-header-establecimiento { order: 2; flex: 1 1 100%; }
-  .rodeo-header-establecimiento select { width: 100%; padding: 10px 14px; font-size: 15px; }
-  .rodeo-header-global { order: 3; flex: 1 1 100%; }
-  .rodeo-header-nav-link { display: inline-flex; align-items: center; min-height: 40px; }
-
-  .rodeo-header-user { flex: 1 1 100%; gap: 8px; }
+  .rodeo-header-establecimiento {
+    order: 5; flex: 1 1 100%;
+    display: flex; justify-content: center;
+  }
+  .rodeo-header-establecimiento select { padding: 10px 14px; font-size: 15px; }
 
   /* "Volver a módulos" se reubica por JS (main.js, BIT-58) dentro del
      panel de navegación en móvil -- mismo <a>, sin duplicar. Pisa el
