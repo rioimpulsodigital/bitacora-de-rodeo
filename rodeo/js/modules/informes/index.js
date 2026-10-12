@@ -4,16 +4,26 @@
 // módulos de registro (Visitas/Atenciones/Novedades): visible a cualquier
 // perfil con sesión, la autorización real sobre los datos la sigue
 // resolviendo RLS tabla por tabla (ver services.js).
-
+//
+// BIT-12 (corrección de arquitectura global, 12 Oct 2026): Informes
+// abarca toda la actividad autorizada de la profesional ENTRE
+// establecimientos -- nunca pertenece al establecimiento activo del
+// header. `{ global: true }` le dice al shell (router.js) que mientras
+// esta ruta esté activa oculte el selector de establecimiento -- la
+// detección multiestablecimiento ya la hacía bien el agregador desde el
+// inicio (obtenerActividad() filtra por profesionalId, nunca por
+// ctx.establecimientoActivoId); lo que estaba mal era solo la
+// navegación, que daba a entender lo contrario.
 import { registerRoute } from '../../router.js';
+import { escapeHtml } from '../../dashboard.js';
 import { mountInformeDiario } from './diario.js';
 import { mountInformeMensual } from './mensual.js';
 
-function mountInformesLanding(contenedor) {
+function mountInformesLanding(contenedor, ctx) {
   contenedor.innerHTML = `
     <div class="rodeo-card">
-      <h2>Informes</h2>
-      <p class="rodeo-hint">Generá un informe a partir de lo que ya registraste -- nunca hace falta volver a escribirlo.</p>
+      <h2>Informes de ${escapeHtml(ctx.perfil.nombre)}</h2>
+      <p class="rodeo-hint">Generá un informe a partir de lo que ya registraste -- nunca hace falta volver a escribirlo. Abarca todos los establecimientos donde tengas actividad registrada, no solo el que esté activo en este momento.</p>
       <div class="rodeo-form-acciones">
         <a class="rodeo-btn" href="#informes/diario">Informe Diario</a>
         <a class="rodeo-link-btn" href="#informes/mensual">Informe Mensual</a>
@@ -25,6 +35,6 @@ export function registrarRutasInformes(contenedor, ctx) {
   registerRoute('informes', (partes) => {
     if (partes[0] === 'diario') mountInformeDiario(contenedor, ctx);
     else if (partes[0] === 'mensual') mountInformeMensual(contenedor, ctx);
-    else mountInformesLanding(contenedor);
-  });
+    else mountInformesLanding(contenedor, ctx);
+  }, { global: true });
 }
