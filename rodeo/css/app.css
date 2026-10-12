@@ -27,6 +27,20 @@
   gap: 16px;
 }
 
+/* BIT-12 (ajuste final de distribución, 12 Oct 2026): dos grupos
+   claramente diferenciados -- izquierda = navegación (marca, Volver,
+   establecimiento activo, Informes), derecha = sesión (usuario, rol,
+   cerrar sesión). Antes esos elementos eran hermanos directos del
+   header y el espaciado uniforme de `space-between` los separaba sin
+   ninguna agrupación visual real. */
+.rodeo-header-left {
+  display: flex; align-items: center; gap: 14px;
+  min-width: 0;
+}
+.rodeo-header-right {
+  display: flex; align-items: center;
+}
+
 .rodeo-header-brand {
   display: flex; align-items: center; gap: 10px;
   font-family: var(--font-display); font-weight: 600;
@@ -381,16 +395,28 @@
     padding: 10px 14px;
     gap: 8px 12px;
   }
-  /* BIT-12: fila propia, entre la marca y el establecimiento -- no
-     compite por espacio con "Volver a módulos"/☰ en la primera línea. */
-  .rodeo-header-global { order: 2; flex: 1 1 100%; }
-  .rodeo-header-nav-link { display: inline-flex; align-items: center; min-height: 40px; }
-  .rodeo-header-establecimiento { order: 3; flex: 1 1 100%; }
+  /* BIT-12 (ajuste final de distribución): mismos dos grupos que en
+     escritorio (navegación/sesión), apilados en vez de lado a lado --
+     .rodeo-header-left ocupa su propia fila completa y se reparte en
+     sub-filas internas; .rodeo-header-right queda debajo, separado por
+     un borde para distinguir claramente el grupo de sesión del de
+     navegación. "Volver a módulos" sigue reubicándose por JS dentro del
+     panel de navegación (ver más abajo) -- en esta fila de marca+☰ solo
+     queda el logo/título. */
+  .rodeo-header-left { flex-wrap: wrap; flex: 1 1 100%; gap: 8px 12px; }
+  .rodeo-header-right {
+    flex: 1 1 100%;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255,255,255,0.15);
+  }
+
+  .rodeo-menu-toggle { display: flex; order: 1; }
+  .rodeo-header-establecimiento { order: 2; flex: 1 1 100%; }
   .rodeo-header-establecimiento select { width: 100%; padding: 10px 14px; font-size: 15px; }
-  /* Propia fila -- antes competía por espacio con brand+Volver en la
-     primera línea, que ahora además comparte con el botón ☰. */
-  .rodeo-header-user { order: 4; flex: 1 1 100%; gap: 8px; }
-  .rodeo-menu-toggle { display: flex; }
+  .rodeo-header-global { order: 3; flex: 1 1 100%; }
+  .rodeo-header-nav-link { display: inline-flex; align-items: center; min-height: 40px; }
+
+  .rodeo-header-user { flex: 1 1 100%; gap: 8px; }
 
   /* "Volver a módulos" se reubica por JS (main.js, BIT-58) dentro del
      panel de navegación en móvil -- mismo <a>, sin duplicar. Pisa el
