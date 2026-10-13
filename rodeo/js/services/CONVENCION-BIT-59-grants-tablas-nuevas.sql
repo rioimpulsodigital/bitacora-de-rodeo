@@ -43,6 +43,29 @@
 --   convención es 100% preventiva, para tablas que se creen DE ACÁ EN
 --   ADELANTE -- no hay ninguna acción urgente sobre el schema actual.
 --
+-- ── ESTADO REAL DE PRODUCCIÓN, CONFIRMADO POR DIAGNÓSTICO (Claudy, 13 Oct
+--    2026 -- BIT-59-03, solo lectura) -- no una suposición ────────────────
+--
+--   Producción YA tiene `ALTER DEFAULT PRIVILEGES` configurado a nivel del
+--   rol `postgres`/esquema `public` con el MISMO efecto que Supabase va a
+--   aplicar globalmente el 30 Oct 2026: toda tabla, secuencia o función
+--   NUEVA creada por `postgres` ya sale sin privilegios de datos
+--   automáticos para `anon`/`authenticated`/`service_role`. Las 14 tablas
+--   de dominio YA operan con GRANTs explícitos hoy -- no dependen de
+--   ningún comportamiento automático de Supabase, ni histórico ni futuro.
+--
+--   Consecuencia directa: `migration-BIT-59-opt-in-temprano.sql` (el
+--   mecanismo secundario que proponía adelantar ese mismo opt-in) resultó
+--   REDUNDANTE -- Producción ya opera así -- y se RETIRÓ del repo (ver
+--   historial de PR #18) en vez de dejarla como "preparada, no aplicada",
+--   para no dejar un artefacto que invite a ejecutar algo que ya no hace
+--   falta. Esta convención (el checklist de abajo) queda como el ÚNICO
+--   mecanismo de BIT-59 -- y sigue siendo necesario precisamente PORQUE
+--   Producción ya niega por defecto: toda tabla nueva que no siga este
+--   checklist explícito queda inaccesible por la Data API (42501) hasta
+--   que alguien agregue el GRANT a mano -- es el comportamiento deseado,
+--   no un bug a corregir.
+--
 -- ── GRANT NO ES RLS -- SON DOS CAPAS INDEPENDIENTES ─────────────────────────
 --
 --   GRANT decide si un rol puede tocar la tabla EN ABSOLUTO (a nivel de
@@ -156,6 +179,14 @@
 --   preexistente de Postgres (PUBLIC recibe EXECUTE automático en toda
 --   función nueva, en sentido contrario al de las tablas). No es el
 --   breaking change fechado que motiva BIT-59, pero es una superficie de
---   seguridad real para las funciones SECURITY DEFINER de este proyecto. Se
---   documenta como hallazgo para una posible tarea independiente futura,
---   no se resuelve acá.
+--   seguridad real para las funciones SECURITY DEFINER de este proyecto --
+--   KLIAM lo separó como **BIT-68** (funciones SECURITY DEFINER abiertas a
+--   PUBLIC). No se resuelve acá.
+--
+-- * El diagnóstico real de Producción (Claudy, BIT-59-03) encontró
+--   privilegios `TRUNCATE` otorgados a los roles de la Data API sobre
+--   tablas existentes -- el mismo límite conocido que advertía la
+--   migración de opt-in ya retirada (el `REVOKE` estándar de default
+--   privileges no cubre `TRUNCATE`/`REFERENCES`/`TRIGGER`, solo
+--   SELECT/INSERT/UPDATE/DELETE). KLIAM lo separó como **BIT-67**
+--   (privilegios TRUNCATE). No se resuelve acá.

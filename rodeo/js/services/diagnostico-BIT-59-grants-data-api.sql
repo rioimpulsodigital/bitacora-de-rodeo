@@ -13,6 +13,15 @@
 -- NO porque haya un riesgo real sobre estas 14 tablas).
 --
 -- Pegar el resultado de cada sección tal como venga (no resumir ni editar).
+--
+-- EJECUTADO -- resultado real (Claudy, BIT-59-03, 13 Oct 2026): PASS.
+-- Producción ya tiene `ALTER DEFAULT PRIVILEGES` configurado para `postgres`
+-- en `public` con el mismo efecto que el opt-out de Supabase del 30 Oct
+-- 2026 -- tablas/secuencias/funciones NUEVAS ya salen sin privilegios de
+-- datos automáticos. Las 14 tablas existentes ya operan con GRANTs
+-- explícitos. Detalle completo y hallazgos derivados (BIT-67, BIT-68) en
+-- el informe de BIT-59 en Notion -- este archivo se conserva como el
+-- script reproducible, no como el registro de resultados.
 
 -- ══════════════════════════════════════════════════════════════════════════
 -- SECCIÓN 1 — GRANTs reales por tabla y rol (anon / authenticated / service_role)
@@ -133,9 +142,11 @@ ORDER BY funcion, grantee;
 -- modifica nada)
 -- ══════════════════════════════════════════════════════════════════════════
 
--- Confirma si el proyecto ya tiene el default revocado para objetos NUEVOS
--- (lo que haría redundante -- no dañino -- aplicar migration-BIT-59-opt-in-
--- temprano.sql más abajo en este mismo módulo):
+-- Confirma si el proyecto ya tiene el default revocado para objetos NUEVOS.
+-- Resultado real (13 Oct 2026): SÍ -- `postgres` ya tiene `ALTER DEFAULT
+-- PRIVILEGES` configurado en `public`, por lo que ninguna migración de
+-- opt-in adicional hace falta (la que existía para ese fin se retiró del
+-- repo por redundante -- ver CONVENCION-BIT-59-grants-tablas-nuevas.sql):
 SELECT
   defaclrole::regrole AS rol_que_definio_el_default,
   defaclnamespace::regnamespace AS esquema,
