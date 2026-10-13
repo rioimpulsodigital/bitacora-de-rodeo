@@ -230,35 +230,54 @@ async function limpiarFotoHuerfana(path) {
 
 // Reemplaza la foto de un Paciente YA EXISTENTE (alta por primera vez desde
 // Editar, o reemplazo de una foto previa) -- a diferencia de crearAnimal(),
-// acá SÍ hace falta una operación atómica server-side: animales_update ya
-// exige ADMINISTRADOR/PROFESIONAL (BIT-11), y borrar la foto VIEJA de
-// Storage una vez confirmado el swap puede necesitar borrar un objeto que
-// subió OTRO usuario (ej. la foto original vino de Catastro, la reemplaza
-// después un Administrador distinto) -- `paciente_fotos_delete_propio_no_
-// referenciado` (migration-BIT-50-storage-fotos.sql) exige `owner =
-// auth.uid()`, así que no alcanza para este caso. La RPC
-// `actualizar_foto_paciente` (SECURITY DEFINER, migration-BIT-13-
-// reemplazar-foto-paciente.sql) hace el UPDATE + el DELETE del objeto viejo
-// como una sola operación server-side, validando el mismo acceso que
-// animales_update -- sin ampliar ningún GRANT/policy general sobre
-// storage.objects.
+// acá SÍ hace falta validación atómica server-side para el UPDATE:
+// animales_update ya exige ADMINISTRADOR/PROFESIONAL (BIT-11), más la
+// garantía de que el path nuevo pertenece al establecimiento real de ESE
+// Paciente -- ninguna policy de Storage puede expresar eso (no conoce la
+// tabla `animales`). La RPC `actualizar_foto_paciente` (SECURITY DEFINER,
+// migration-BIT-13-reemplazar-foto-paciente.sql) hace ÚNICAMENTE esa
+// validación + el UPDATE, y devuelve el path VIEJO -- nunca toca
+// `storage.objects` directamente (corrección BIT-13-02, hallazgo de KLIAM:
+// las tablas de `storage` son metadata, borrar su fila a mano no garantiza
+// que se borre el objeto físico -- toda mutación de Storage tiene que
+// pasar por la Storage API real, acá mismo, del lado del cliente).
 //
-// Orden: 1) subir la foto NUEVA (con un path nuevo, nunca se sobreescribe
-// el objeto viejo) 2) recién si eso funciona, pedirle a la RPC que
-// actualice animales.foto_path y borre el objeto viejo. Si la RPC falla,
-// la foto nueva queda huérfana (compensada acá mismo) y la foto vieja
-// sigue intacta -- nunca se borra una foto antes de confirmar la nueva.
+// Orden: 1) subir la foto NUEVA a un path nuevo vía Storage API (nunca se
+// sobreescribe el objeto viejo) 2) la RPC confirma el swap y devuelve el
+// path viejo 3) recién ahí se borra el objeto viejo, también vía Storage
+// API, con la policy nueva y acotada del PASO 2b de la migración (permite
+// a ADMINISTRADOR/PROFESIONAL borrar una foto no referenciada de su
+// establecimiento, incluso si la subió otro usuario). Si el paso 2 falla,
+// la foto nueva queda huérfana (compensada acá mismo) y la vieja sigue
+// intacta. Si el paso 3 falla, queda un huérfano documentado -- la foto
+// activa del Paciente YA es la nueva: ese fallo nunca revierte nada.
 export async function reemplazarFotoPaciente(animalId, establecimientoId, file) {
   const nuevoPath = await subirFotoPaciente(establecimientoId, file);
+
+  let fotoPathAnterior;
   try {
-    const { error } = await supabase.rpc('actualizar_foto_paciente', {
+    const { data, error } = await supabase.rpc('actualizar_foto_paciente', {
       p_animal_id: animalId,
       p_nuevo_foto_path: nuevoPath,
     });
     if (error) throw error;
+    fotoPathAnterior = data; // null si el Paciente no tenía foto previa
   } catch (err) {
     await limpiarFotoHuerfana(nuevoPath);
     throw err;
+  }
+
+  // El swap ya está confirmado -- borrar la vieja es best-effort. Un fallo
+  // acá queda como huérfano documentado (revisión periódica, mismo
+  // criterio ya aceptado en BIT-48/BIT-50), nunca se vuelve a lanzar: el
+  // reemplazo en sí ya fue exitoso.
+  if (fotoPathAnterior) {
+    try {
+      const { error: errorBorrado } = await supabase.storage.from(BUCKET_FOTOS).remove([fotoPathAnterior]);
+      if (errorBorrado) throw errorBorrado;
+    } catch (e) {
+      console.error('[Paciente] no se pudo borrar la foto anterior (queda huérfana):', e);
+    }
   }
 }
 
