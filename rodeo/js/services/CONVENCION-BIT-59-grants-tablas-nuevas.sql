@@ -1,0 +1,192 @@
+-- ══════════════════════════════════════════════════════════════════════════
+-- BIT-59 — CONVENCIÓN OBLIGATORIA para crear cualquier tabla nueva en
+-- Bitácora de Rodeo a partir del 12 Oct 2026.
+--
+-- Este archivo NO es una migración que se ejecuta -- es la plantilla/
+-- checklist que toda IA Code (Anthy, Claudy o quien siga) debe copiar y
+-- completar como PRIMER paso al preparar la migración de una tabla nueva.
+-- Léelo antes de escribir cualquier `CREATE TABLE public....` en este
+-- proyecto.
+-- ══════════════════════════════════════════════════════════════════════════
+
+-- ── POR QUÉ EXISTE ESTA CONVENCIÓN ──────────────────────────────────────────
+--
+-- Supabase anunció un breaking change real y vigente (changelog #45329,
+-- confirmado contra la fuente oficial y contra comentarios de Staff de
+-- Supabase en github.com/orgs/supabase/discussions/45329 el 12 Oct 2026 --
+-- no se trabajó desde memoria ni documentación histórica):
+--
+--   Hasta ahora, toda tabla NUEVA creada en el esquema `public` recibía
+--   automáticamente SELECT/INSERT/UPDATE/DELETE para `anon`, `authenticated`
+--   y `service_role` -- el acceso desde la Data API (supabase-js/PostgREST)
+--   "funcionaba solo" sin que nadie otorgara nada a propósito.
+--
+--   Cronograma real del cambio: 28 Abr 2026 (casillero de opt-out
+--   disponible al crear un proyecto) -> 30 May 2026 (opt-out es el default
+--   para proyectos NUEVOS) -> 30 Oct 2026 (el opt-out se aplica a TODOS los
+--   proyectos existentes, incluido este).
+--
+--   A partir de esa fecha, toda tabla NUEVA que no reciba un GRANT explícito
+--   devuelve error 42501 "permission denied for table X" por la Data API --
+--   incluso para `service_role`.
+--
+-- ── LO QUE NO CAMBIA (confirmado con Staff de Supabase, no es una
+--    suposición) ──────────────────────────────────────────────────────────
+--
+--   Las tablas que YA EXISTEN en este proyecto (las 14 tablas de dominio:
+--   jornadas, animales, lotes, lotes_animales, visitas, observaciones_campo,
+--   novedades_establecimiento, novedades_adjuntos, atenciones_clinicas,
+--   personas, personas_establecimientos, perfiles, establecimientos,
+--   establecimientos_usuarios) CONSERVAN sus GRANTs actuales para siempre --
+--   "will never be silently revoked" (steve-chavez, Staff de Supabase, 20
+--   Jul 2026). El 30 Oct 2026 NO rompe nada de lo que ya funciona hoy. Esta
+--   convención es 100% preventiva, para tablas que se creen DE ACÁ EN
+--   ADELANTE -- no hay ninguna acción urgente sobre el schema actual.
+--
+-- ── ESTADO REAL DE PRODUCCIÓN, CONFIRMADO POR DIAGNÓSTICO (Claudy, 13 Oct
+--    2026 -- BIT-59-03, solo lectura) -- no una suposición ────────────────
+--
+--   Producción YA tiene `ALTER DEFAULT PRIVILEGES` configurado a nivel del
+--   rol `postgres`/esquema `public` con el MISMO efecto que Supabase va a
+--   aplicar globalmente el 30 Oct 2026: toda tabla, secuencia o función
+--   NUEVA creada por `postgres` ya sale sin privilegios de datos
+--   automáticos para `anon`/`authenticated`/`service_role`. Las 14 tablas
+--   de dominio YA operan con GRANTs explícitos hoy -- no dependen de
+--   ningún comportamiento automático de Supabase, ni histórico ni futuro.
+--
+--   Consecuencia directa: `migration-BIT-59-opt-in-temprano.sql` (el
+--   mecanismo secundario que proponía adelantar ese mismo opt-in) resultó
+--   REDUNDANTE -- Producción ya opera así -- y se RETIRÓ del repo (ver
+--   historial de PR #18) en vez de dejarla como "preparada, no aplicada",
+--   para no dejar un artefacto que invite a ejecutar algo que ya no hace
+--   falta. Esta convención (el checklist de abajo) queda como el ÚNICO
+--   mecanismo de BIT-59 -- y sigue siendo necesario precisamente PORQUE
+--   Producción ya niega por defecto: toda tabla nueva que no siga este
+--   checklist explícito queda inaccesible por la Data API (42501) hasta
+--   que alguien agregue el GRANT a mano -- es el comportamiento deseado,
+--   no un bug a corregir.
+--
+-- ── GRANT NO ES RLS -- SON DOS CAPAS INDEPENDIENTES ─────────────────────────
+--
+--   GRANT decide si un rol puede tocar la tabla EN ABSOLUTO (a nivel de
+--   objeto de Postgres). RLS decide, una vez que el rol ya pudo entrar,
+--   CUÁLES FILAS puede leer/escribir. Sin GRANT, RLS nunca se evalúa --- la
+--   Data API ni llega a intentarlo. Con GRANT pero sin RLS habilitada, el
+--   rol otorgado ve/edita TODA la tabla sin ninguna restricción por fila.
+--   Las dos capas son obligatorias juntas, nunca una sustituye a la otra.
+
+-- ── CHECKLIST, EN ORDEN, AL CREAR UNA TABLA NUEVA ───────────────────────────
+--
+-- 1) ¿Esta tabla necesita ser leída o escrita desde el frontend (vía
+--    supabase-js, es decir la Data API)?
+--
+--    NO -> no otorgar ningún GRANT a `anon` ni `authenticated`. La tabla
+--          queda interna por diseño (deny by default) -- solo alcanzable
+--          por conexión directa a Postgres o por una función
+--          SECURITY DEFINER explícita si hace falta. Esto es intencional,
+--          no un olvido: no todas las tablas deben ser accesibles desde el
+--          frontend.
+--
+--    SÍ  -> seguir con el paso 2.
+--
+-- 2) Para cada rol, otorgar SOLO los verbos que el frontend real ejecuta --
+--    nunca los 4 (SELECT/INSERT/UPDATE/DELETE) "por si acaso". Mismo
+--    criterio que ya usa BIT-49c con GRANT por columna sobre `jornadas`.
+--
+--    `anon`           -- en este proyecto, el login es obligatorio desde
+--                        BIT-03: Bitácora de Rodeo no expone nada a
+--                        usuarios no autenticados. Dejar `anon` SIN ningún
+--                        GRANT salvo que haya una razón real, explícita y
+--                        documentada acá mismo.
+--
+--    `authenticated`  -- los verbos concretos que ya usa el módulo
+--                        correspondiente (ver rodeo/js/modules/<modulo>/
+--                        services.js). RLS sigue siendo la barrera real de
+--                        "cuáles filas"; el GRANT es la barrera de "puede
+--                        tocar la tabla en absoluto". Ejemplo real de este
+--                        proyecto: `atenciones_clinicas` -> GRANT SELECT,
+--                        INSERT, UPDATE (nunca DELETE, ver BIT-35).
+--
+--    `service_role`   -- SOLO si hay o va a haber automatización de
+--                        backend (Edge Function, cron) que necesite byp
+--                        asar RLS sobre esa tabla. Hoy este proyecto NO usa
+--                        `service_role` desde ningún lugar (la única
+--                        credencial commiteada es la Anon Key, BIT-03) --
+--                        no otorgar "por si en algún momento se necesita".
+--
+-- 3) ¿La PK usa `GENERATED ALWAYS/BY DEFAULT AS IDENTITY` o `serial` (en vez
+--    de `uuid`, que es el default real de las 14 tablas existentes de este
+--    proyecto)? Si sí, otorgar también `USAGE, SELECT` en la secuencia
+--    asociada a los mismos roles que reciben INSERT en la tabla -- sin esto,
+--    un INSERT falla al no poder leer `nextval()`.
+--
+-- 4) Inmediatamente después de los GRANT, en la MISMA migración:
+--    `ALTER TABLE public.<tabla> ENABLE ROW LEVEL SECURITY;` + las policies
+--    reales (mismo patrón que toda migración ya aplicada en este repo --
+--    ver jornadas/migration-BIT-49-papelera-jornadas.sql o
+--    novedades/migration-BIT-48-papelera-novedades.sql como referencia de
+--    estilo).
+--
+-- 5) Si la tabla expone una función RPC nueva llamada vía `.rpc(...)` desde
+--    el frontend, no olvidar `GRANT EXECUTE ON FUNCTION ... TO authenticated;`
+--    -- distinto mecanismo de Postgres (las funciones nuevas reciben EXECUTE
+--    de PUBLIC por defecto, al revés que las tablas), pero igual de real.
+--    Ejemplo ya existente: `crear_persona_con_establecimiento`
+--    (animales/migration-BIT-11-fix-personas-rls.sql).
+--
+-- 6) Nunca copiar un `GRANT ALL`/`GRANT ... TO public` genérico solo para
+--    hacer desaparecer un error 42501 -- el propio mensaje de Postgres ya
+--    trae como pista el GRANT exacto que falta; decidir siempre según el
+--    checklist de arriba, nunca por atajo.
+
+-- ── PLANTILLA LISTA PARA COMPLETAR (reemplazar <tabla>/<columnas>/<rol>) ────
+--
+-- -- 1) Permisos mínimos y explícitos (Data API) -----------------------------
+-- GRANT SELECT ON public.<tabla> TO authenticated;              -- ejemplo
+-- GRANT INSERT, UPDATE ON public.<tabla> TO authenticated;      -- ejemplo
+-- -- (sin DELETE salvo que la tabla lo necesite de verdad -- ver BIT-35)
+-- -- (sin ninguna línea para `anon` salvo justificación explícita)
+-- -- (sin ninguna línea para `service_role` salvo automatización de backend real)
+--
+-- -- 2) Secuencia, solo si la PK no es uuid ------------------------------------
+-- -- GRANT USAGE, SELECT ON SEQUENCE public.<tabla>_<columna>_seq TO authenticated;
+--
+-- -- 3) RLS, en la misma migración ---------------------------------------------
+-- ALTER TABLE public.<tabla> ENABLE ROW LEVEL SECURITY;
+-- CREATE POLICY "<tabla>_select" ON public.<tabla> FOR SELECT TO authenticated
+--   USING (tiene_acceso_establecimiento(establecimiento_id));
+-- -- (agregar INSERT/UPDATE/DELETE según corresponda, mismo criterio ya usado
+-- -- en el resto de las tablas del proyecto -- nunca una policy PERMISSIVE
+-- -- amplia "true" sin filtro real)
+
+-- ── HALLAZGOS RELACIONADOS, FUERA DEL ALCANCE DE BIT-59 (documentados,
+--    no resueltos acá) ───────────────────────────────────────────────────
+--
+-- * Este repo no versiona ningún `CREATE TABLE` de las 14 tablas de dominio
+--   -- ya identificado como hallazgo CRÍTICO de BIT-60 ("schema sin
+--   CREATE TABLE versionado"). BIT-59 no lo resuelve (sería "refactor
+--   general de la base de datos", explícitamente fuera de alcance) -- lo
+--   confirma de nuevo: si alguna vez hiciera falta reproducir el schema
+--   desde cero a partir de este repo, ninguna tabla se crearía, y por lo
+--   tanto ninguna recibiría GRANTs -- el riesgo real no es el breaking
+--   change de Supabase, es la falta de un schema inicial versionado. Queda
+--   como el mismo pendiente que ya tiene BIT-60, no uno nuevo.
+--
+-- * El checkbox real de Supabase para proyectos nuevos dice "Automatically
+--   expose new tables" (algunas fuentes de abril 2026 mencionan "and
+--   functions", sin confirmación posterior de Staff) -- EXECUTE sobre
+--   funciones nuevas es, en cualquier caso, un mecanismo DISTINTO y
+--   preexistente de Postgres (PUBLIC recibe EXECUTE automático en toda
+--   función nueva, en sentido contrario al de las tablas). No es el
+--   breaking change fechado que motiva BIT-59, pero es una superficie de
+--   seguridad real para las funciones SECURITY DEFINER de este proyecto --
+--   KLIAM lo separó como **BIT-68** (funciones SECURITY DEFINER abiertas a
+--   PUBLIC). No se resuelve acá.
+--
+-- * El diagnóstico real de Producción (Claudy, BIT-59-03) encontró
+--   privilegios `TRUNCATE` otorgados a los roles de la Data API sobre
+--   tablas existentes -- el mismo límite conocido que advertía la
+--   migración de opt-in ya retirada (el `REVOKE` estándar de default
+--   privileges no cubre `TRUNCATE`/`REFERENCES`/`TRIGGER`, solo
+--   SELECT/INSERT/UPDATE/DELETE). KLIAM lo separó como **BIT-67**
+--   (privilegios TRUNCATE). No se resuelve acá.
