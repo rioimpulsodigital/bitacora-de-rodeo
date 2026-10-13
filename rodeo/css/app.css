@@ -368,6 +368,22 @@
   object-fit: cover;
 }
 
+/* Foto principal del Paciente en el formulario normal de Pacientes (BIT-13)
+   -- mismo lenguaje visual que .rodeo-catastro-foto-* de arriba, con su
+   propio nombre porque vive en un módulo distinto (convención ya vigente
+   en el proyecto: cada módulo tiene sus propias clases aunque el patrón
+   visual se repita). La imagen en sí reutiliza .rodeo-ficha-foto/
+   .rodeo-ficha-img (mismo módulo, misma ficha que ya usa detail.js). */
+.rodeo-paciente-foto-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 10px; }
+.rodeo-paciente-foto-btn {
+  flex: 1 1 140px;
+  font-family: var(--font-body); font-size: 14px; font-weight: 600;
+  background: var(--bg); color: var(--dark-teal);
+  border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px 10px; min-height: 48px; cursor: pointer;
+}
+.rodeo-paciente-foto-btn:hover { background: var(--surface2); }
+
 /* Pantalla operativa de Jornada (BIT-61) -- LLEGADA/SALIDA. Reutiliza
    .rodeo-card/.salida-btn/.rodeo-hint/.rodeo-link-btn ya existentes. */
 .rodeo-jornada-operativa {
