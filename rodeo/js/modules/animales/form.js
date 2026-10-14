@@ -2,6 +2,7 @@ import {
   getAnimal, crearAnimal, actualizarAnimal,
   listPersonas, crearPersona,
   listLotes, getLoteActivoDeAnimal, actualizarLoteDeAnimal,
+  validarFoto, reemplazarFotoPaciente, getFotoUrlFirmada,
 } from './services.js';
 import { SEXO_OPTS } from './labels.js';
 import { escapeHtml } from '../../dashboard.js';
@@ -79,6 +80,22 @@ export async function mountAnimalForm(contenedor, ctx, id) {
       <h2>${animal ? 'Editar Paciente Animal' : 'Nuevo Paciente Animal'}</h2>
       <form id="rodeo-animal-form">
 
+        <label class="form-label">Fotografía (opcional)</label>
+        <div class="rodeo-ficha-foto" id="rodeo-foto-wrap">
+          ${animal?.foto_path ? '<p class="rodeo-loading">Cargando fotografía…</p>' : (animal ? '<p class="rodeo-ficha-vacio">Sin fotografía</p>' : '')}
+        </div>
+        <div class="rodeo-paciente-foto-acciones">
+          <button type="button" class="rodeo-paciente-foto-btn" id="rodeo-foto-camara-btn">📷 Sacar foto</button>
+          <button type="button" class="rodeo-paciente-foto-btn" id="rodeo-foto-galeria-btn">🖼️ Elegir de la galería</button>
+        </div>
+        <!-- Dos inputs a propósito: 'capture' fuerza la cámara en Android/iOS
+             y con un solo input no hay forma portable de ofrecer también
+             galería (mismo patrón ya validado en modules/catastro/form.js). -->
+        <input type="file" accept="image/*" capture="environment" id="rodeo-foto-camara" hidden>
+        <input type="file" accept="image/*" id="rodeo-foto-galeria" hidden>
+        <button type="button" class="rodeo-link-btn" id="rodeo-foto-cancelar" style="display:none;margin-left:0">Cancelar cambio de foto</button>
+        <div id="rodeo-foto-error" class="rodeo-error" style="margin-bottom:12px"></div>
+
         <label class="form-label">Especie <span class="rodeo-required">*</span></label>
         <select class="form-field" name="especie" required>
           <option value="">Seleccionar especie…</option>
@@ -144,6 +161,88 @@ export async function mountAnimalForm(contenedor, ctx, id) {
         </div>
       </form>
     </div>`;
+
+  // ── Lógica de foto (BIT-13) ───────────────────────────────────
+  // Mismo patrón de cámara/galería ya validado en modules/catastro/form.js
+  // (dos inputs ocultos, la última elección gana, preview local vía
+  // createObjectURL). Diferencia respecto a Catastro: acá puede existir una
+  // foto YA guardada (edición) -- "Cancelar cambio de foto" no significa
+  // "sin foto", significa "volver a mostrar la foto original", nunca borra
+  // nada hasta que se guarde el formulario.
+  const fotoWrap        = document.getElementById('rodeo-foto-wrap');
+  const fotoCamaraInput = document.getElementById('rodeo-foto-camara');
+  const fotoGaleriaInput = document.getElementById('rodeo-foto-galeria');
+  const fotoCancelarBtn = document.getElementById('rodeo-foto-cancelar');
+  const fotoErrorEl     = document.getElementById('rodeo-foto-error');
+
+  let fotoFile = null;
+  let fotoPreviewUrl = null;
+
+  function renderFotoVacia() {
+    fotoWrap.innerHTML = '<p class="rodeo-ficha-vacio">Sin fotografía</p>';
+  }
+
+  function renderFotoImg(src, alt) {
+    fotoWrap.innerHTML = '';
+    const img = document.createElement('img');
+    img.className = 'rodeo-ficha-img';
+    img.alt = alt;
+    img.addEventListener('error', () => {
+      fotoWrap.innerHTML = '<p class="rodeo-error">No se pudo cargar la fotografía.</p>';
+    });
+    img.src = src;
+    fotoWrap.replaceChildren(img);
+  }
+
+  // La foto YA guardada se resuelve una sola vez, de forma asíncrona (igual
+  // que detail.js) -- se guarda la URL para poder "cancelar" una selección
+  // nueva sin tener que volver a pedirla.
+  let urlFotoOriginal = null;
+  if (animal?.foto_path) {
+    getFotoUrlFirmada(animal.foto_path).then((url) => {
+      if (!fotoWrap.isConnected) return; // el usuario ya navegó a otra vista
+      urlFotoOriginal = url;
+      if (fotoFile) return; // ya eligió una foto nueva mientras esto cargaba
+      if (url) renderFotoImg(url, 'Fotografía actual del Paciente');
+      else fotoWrap.innerHTML = '<p class="rodeo-error">No se pudo cargar la fotografía actual.</p>';
+    });
+  }
+
+  function cancelarCambioFoto() {
+    fotoFile = null;
+    fotoCamaraInput.value = '';
+    fotoGaleriaInput.value = '';
+    if (fotoPreviewUrl) URL.revokeObjectURL(fotoPreviewUrl);
+    fotoPreviewUrl = null;
+    fotoCancelarBtn.style.display = 'none';
+    fotoErrorEl.textContent = '';
+    if (urlFotoOriginal) renderFotoImg(urlFotoOriginal, 'Fotografía actual del Paciente');
+    else renderFotoVacia();
+  }
+
+  function alElegirFoto(input, otroInput) {
+    const file = input.files?.[0] ?? null;
+    if (!file) return; // el usuario canceló el selector: se conserva la foto previa
+    const problema = validarFoto(file);
+    if (problema) {
+      input.value = '';
+      fotoErrorEl.textContent = problema;
+      return;
+    }
+    fotoErrorEl.textContent = '';
+    otroInput.value = '';
+    if (fotoPreviewUrl) URL.revokeObjectURL(fotoPreviewUrl);
+    fotoFile = file;
+    fotoPreviewUrl = URL.createObjectURL(file);
+    renderFotoImg(fotoPreviewUrl, 'Vista previa de la foto nueva');
+    fotoCancelarBtn.style.display = '';
+  }
+
+  document.getElementById('rodeo-foto-camara-btn').addEventListener('click', () => fotoCamaraInput.click());
+  document.getElementById('rodeo-foto-galeria-btn').addEventListener('click', () => fotoGaleriaInput.click());
+  fotoCamaraInput.addEventListener('change', () => alElegirFoto(fotoCamaraInput, fotoGaleriaInput));
+  fotoGaleriaInput.addEventListener('change', () => alElegirFoto(fotoGaleriaInput, fotoCamaraInput));
+  fotoCancelarBtn.addEventListener('click', cancelarCambioFoto);
 
   // ── Lógica de tutor inline ────────────────────────────────────
   const selectTutor  = document.getElementById('rodeo-tutor-select');
@@ -224,13 +323,34 @@ export async function mountAnimalForm(contenedor, ctx, id) {
 
     const loteId = fd.get('lote_id') || null;
 
+    // BIT-13: al crear, la foto necesita el establecimiento activo para
+    // elegir la carpeta del bucket -- si todavía no hay ninguno elegido, se
+    // avisa ANTES de intentar subir nada (mismo criterio que el resto del
+    // formulario: nunca intentar una operación que la RLS va a rechazar de
+    // todos modos, pero con un mensaje claro en vez de un error técnico).
+    if (!animal && fotoFile && !ctx.establecimientoActivoId) {
+      errorEl.textContent = 'Elegí un establecimiento activo antes de agregar una foto.';
+      return;
+    }
+
     try {
       if (animal) {
         await actualizarAnimal(animal.id, campos);
         await actualizarLoteDeAnimal(animal.id, loteId);
+        // La foto se reemplaza DESPUÉS de guardar el resto de los datos, en
+        // un paso aparte: si falla, el Paciente ya quedó guardado
+        // correctamente -- nunca se corrompe por un problema de la foto.
+        if (fotoFile) {
+          try {
+            await reemplazarFotoPaciente(animal.id, animal.establecimiento_actual_id, fotoFile);
+          } catch (fotoErr) {
+            errorEl.textContent = 'Los datos se guardaron, pero la foto no se pudo actualizar: ' + fotoErr.message;
+            return;
+          }
+        }
         location.hash = '#animales';
       } else {
-        const nuevo = await crearAnimal(campos);
+        const nuevo = await crearAnimal(campos, fotoFile);
         if (loteId) await actualizarLoteDeAnimal(nuevo.id, loteId);
         const returnTo = sessionStorage.getItem('_atenciones_return');
         if (returnTo) {
