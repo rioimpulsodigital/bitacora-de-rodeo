@@ -5,6 +5,7 @@
 
 import { getVisita } from './services.js';
 import { escapeHtml } from '../../dashboard.js';
+import { bloquearSiEsAjeno } from '../../services/contexto.js';
 
 const LABEL_TIPO = {
   programada: 'Programada',
@@ -48,6 +49,10 @@ export async function mountVisitaDetail(contenedor, ctx, id) {
     contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">Visita no encontrada.</p><a href="#visitas" class="rodeo-link-btn" style="margin-left:0">Volver al listado</a></div>`;
     return;
   }
+
+  // BIT-70/F-02: una Visita de otro establecimiento no se muestra desde el
+  // contexto activo.
+  if (bloquearSiEsAjeno(contenedor, ctx, visita.establecimiento_id, { entidad: 'Visita', hrefVolver: '#visitas' })) return;
 
   const esSanitaria = visita.tipo === 'sanitaria';
 

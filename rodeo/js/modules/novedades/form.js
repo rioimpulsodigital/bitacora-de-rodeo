@@ -11,6 +11,10 @@ import {
   TIPOS,
   tipoLabel,
 } from './services.js';
+import {
+  bloquearSiEsAjeno, capturarContexto, contextoSigueVigente, MENSAJE_CONTEXTO_CAMBIO,
+} from '../../services/contexto.js';
+import { puedeAccederModulo, puedeEditarNovedad } from '../../services/permisos.js';
 
 function fmtVisita(v) {
   if (!v) return '';
@@ -22,11 +26,13 @@ export async function mountNovedadForm(contenedor, ctx, id) {
   contenedor.innerHTML = '<p class="rodeo-loading">Cargando…</p>';
   const esEdicion = Boolean(id);
   const esAdmin = ctx.perfil.rol === 'ADMINISTRADOR';
+  const puedeVerVisitas = puedeAccederModulo(ctx.perfil, 'visitas');
+  const contextoAlMontar = capturarContexto(ctx); // BIT-70
 
   try {
     const [novedad, visitas, animales, lotes] = await Promise.all([
       esEdicion ? getNovedad(id) : Promise.resolve(null),
-      listVisitasParaSelector(ctx.establecimientoActivoId),
+      puedeVerVisitas ? listVisitasParaSelector(ctx.establecimientoActivoId) : Promise.resolve([]),
       listAnimalesParaSelector(ctx.establecimientoActivoId),
       listLotesParaSelector(ctx.establecimientoActivoId),
     ]);
@@ -36,6 +42,20 @@ export async function mountNovedadForm(contenedor, ctx, id) {
         '<p class="rodeo-error">Novedad no encontrada o sin acceso.</p>' +
         '<p><a href="#novedades">← Volver al listado</a></p>';
       return;
+    }
+
+    if (esEdicion) {
+      // BIT-70/F-02/F-03: no se edita una Novedad de otro establecimiento ni
+      // se arma un formulario con una Novedad de A y relaciones de B.
+      if (bloquearSiEsAjeno(contenedor, ctx, novedad.establecimiento_id, { entidad: 'Novedad', hrefVolver: '#novedades' })) return;
+      // BIT-70/F-05: la ruta del formulario replica el gate de edición que ya
+      // aplican el listado y el detalle (admin/profesional, o autor).
+      if (!puedeEditarNovedad(ctx.perfil, novedad)) {
+        contenedor.innerHTML =
+          '<div class="rodeo-card"><p class="rodeo-error">No tenés permiso para editar esta Novedad.</p>' +
+          '<a href="#novedades" class="rodeo-link-btn" style="margin-left:0">Volver al listado</a></div>';
+        return;
+      }
     }
 
     const tipoActual = novedad?.tipo ?? '';
@@ -97,11 +117,11 @@ export async function mountNovedadForm(contenedor, ctx, id) {
         <label class="form-label">Descripción <span class="form-required">*</span></label>
         <textarea class="form-field" name="descripcion" rows="4" required>${novedad?.descripcion ?? ''}</textarea>
 
-        <label class="form-label">Visita relacionada (opcional)</label>
+        ${puedeVerVisitas ? `<label class="form-label">Visita relacionada (opcional)</label>
         <select class="form-field" name="visita_id">
           <option value="">— Sin visita —</option>
           ${opcionesVisita}
-        </select>
+        </select>` : ''}
 
         <label class="form-label">Paciente Animal (opcional)</label>
         <select class="form-field" name="animal_id">
@@ -170,9 +190,16 @@ export async function mountNovedadForm(contenedor, ctx, id) {
       const fd = new FormData(e.target);
       const campos = Object.fromEntries(fd.entries());
       campos.establecimiento_id = ctx.establecimientoActivoId;
+      if (!puedeVerVisitas) campos.visita_id = novedad?.visita_id ?? null;
 
       const errEl = document.getElementById('form-error');
       errEl.style.display = 'none';
+
+      if (!contextoSigueVigente(ctx, contextoAlMontar)) {
+        errEl.textContent = MENSAJE_CONTEXTO_CAMBIO;
+        errEl.style.display = '';
+        return;
+      }
 
       if (!campos.fecha) {
         errEl.textContent = 'La fecha es obligatoria.';

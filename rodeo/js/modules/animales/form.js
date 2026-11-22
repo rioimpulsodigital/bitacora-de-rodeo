@@ -6,6 +6,9 @@ import {
 } from './services.js';
 import { SEXO_OPTS } from './labels.js';
 import { escapeHtml } from '../../dashboard.js';
+import {
+  bloquearSiEsAjeno, capturarContexto, contextoSigueVigente, MENSAJE_CONTEXTO_CAMBIO,
+} from '../../services/contexto.js';
 
 const ESPECIES = [
   { value: 'equino',  label: 'Equino'  },
@@ -19,6 +22,9 @@ const ESPECIES = [
 
 export async function mountAnimalForm(contenedor, ctx, id) {
   contenedor.innerHTML = '<p class="rodeo-loading">Cargando…</p>';
+  // BIT-70: contexto con el que se monta la pantalla; se vuelve a comprobar
+  // antes de persistir.
+  const contextoAlMontar = capturarContexto(ctx);
 
   if (id && ctx.perfil?.rol === 'OPERADOR_CAMPO') {
     contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">No tenés permiso para editar Pacientes existentes.</p></div>`;
@@ -39,13 +45,18 @@ export async function mountAnimalForm(contenedor, ctx, id) {
       contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">Paciente no encontrado.</p></div>`;
       return;
     }
+    // BIT-70/F-02/F-03: no se edita un Paciente de otro establecimiento ni se
+    // arma un formulario con un registro de A y selectores (lotes) de B.
+    if (bloquearSiEsAjeno(contenedor, ctx, animal.establecimiento_actual_id, { entidad: 'Paciente', hrefVolver: '#animales' })) return;
   }
 
   let personas = [];
   let lotes = [];
   try {
     [personas, lotes] = await Promise.all([
-      listPersonas(),
+      // BIT-70 — 03: solo Tutores vinculados al establecimiento activo, más
+      // el Tutor ya asociado al Paciente que se edita (no se anula en silencio).
+      listPersonas(ctx.establecimientoActivoId, { incluirIds: [animal?.tutor_responsable_id] }),
       listLotes(ctx.establecimientoActivoId),
     ]);
   } catch (e) {
@@ -74,6 +85,10 @@ export async function mountAnimalForm(contenedor, ctx, id) {
   ].join('');
 
   const hayPersonas = personas.length > 0;
+  // BIT-70 — 03: Tutores válidos para ESTA pantalla (los ofrecidos, más los
+  // que se creen inline). Se comprueba al guardar: el valor de un <select>
+  // viene del DOM y no prueba nada.
+  const tutoresPermitidos = new Set(personas.map((p) => p.id));
 
   contenedor.innerHTML = `
     <div class="rodeo-card">
@@ -285,6 +300,7 @@ export async function mountAnimalForm(contenedor, ctx, id) {
       opt.textContent = persona.nombre;
       opt.selected = true;
       selectTutor.appendChild(opt);
+      tutoresPermitidos.add(persona.id); // vinculado al establecimiento activo por la RPC
       selectTutor.style.display = '';
       inlineDiv.style.display = 'none';
       toggleBtn.style.display = '';
@@ -302,6 +318,8 @@ export async function mountAnimalForm(contenedor, ctx, id) {
     const errorEl = document.getElementById('rodeo-form-error');
     errorEl.textContent = '';
 
+    if (!contextoSigueVigente(ctx, contextoAlMontar)) { errorEl.textContent = MENSAJE_CONTEXTO_CAMBIO; return; }
+
     const campos = {
       especie: fd.get('especie'),
       nombre: fd.get('nombre'),
@@ -313,7 +331,11 @@ export async function mountAnimalForm(contenedor, ctx, id) {
       sexo: fd.get('sexo') || null,
       pelaje: fd.get('pelaje'),
       edad_aproximada_anios: fd.get('edad_aproximada_anios') ? parseInt(fd.get('edad_aproximada_anios'), 10) : null,
-      establecimiento_actual_id: ctx.establecimientoActivoId,
+      // BIT-70/F-03: al EDITAR se conserva el establecimiento del Paciente
+      // (ya validado contra el activo al cargar); reenviar el activo podía
+      // trasladar el registro de A a B. Solo al crear (o si el Paciente no
+      // tenía establecimiento) se asigna el activo.
+      establecimiento_actual_id: animal?.establecimiento_actual_id ?? ctx.establecimientoActivoId,
     };
 
     if (!campos.especie) { errorEl.textContent = 'La especie es obligatoria.'; return; }
@@ -322,6 +344,17 @@ export async function mountAnimalForm(contenedor, ctx, id) {
     }
 
     const loteId = fd.get('lote_id') || null;
+
+    // BIT-70 — 03: no se persisten relaciones con registros que la pantalla
+    // no ofreció (Tutor o Lote de otro establecimiento).
+    if (campos.tutor_responsable_id && !tutoresPermitidos.has(campos.tutor_responsable_id)) {
+      errorEl.textContent = 'El Tutor seleccionado no pertenece al establecimiento activo. Elegí otro o creá uno nuevo.';
+      return;
+    }
+    if (loteId && !lotes.some((l) => l.id === loteId)) {
+      errorEl.textContent = 'El Lote seleccionado no pertenece al establecimiento activo.';
+      return;
+    }
 
     // BIT-13: al crear, la foto necesita el establecimiento activo para
     // elegir la carpeta del bucket -- si todavía no hay ninguno elegido, se

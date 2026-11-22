@@ -1,7 +1,10 @@
 import { getVisita, crearVisita, actualizarVisita, listLotesParaSelector } from './services.js';
 import { escapeHtml } from '../../dashboard.js';
+import {
+  bloquearSiEsAjeno, capturarContexto, contextoSigueVigente, MENSAJE_CONTEXTO_CAMBIO,
+} from '../../services/contexto.js';
 
-const TIPOS = ['programada', 'seguimiento', 'emergencia', 'control', 'sanitaria', 'otro'];
+const TIPOS =['programada', 'seguimiento', 'emergencia', 'control', 'sanitaria', 'otro'];
 const LABEL_TIPO_OPT = {
   programada: 'Programada',
   seguimiento: 'Seguimiento',
@@ -28,6 +31,7 @@ function fechaHoyArgentina() {
 
 export async function mountVisitaForm(contenedor, ctx, id) {
   contenedor.innerHTML = '<p class="rodeo-loading">Cargando…</p>';
+  const contextoAlMontar = capturarContexto(ctx); // BIT-70
 
   let visita = null;
   if (id) {
@@ -41,6 +45,9 @@ export async function mountVisitaForm(contenedor, ctx, id) {
       contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">Visita no encontrada.</p></div>`;
       return;
     }
+    // BIT-70/F-02/F-03: no se edita una Visita de otro establecimiento ni se
+    // arma un formulario con una Visita de A y lotes de B.
+    if (bloquearSiEsAjeno(contenedor, ctx, visita.establecimiento_id, { entidad: 'Visita', hrefVolver: '#visitas' })) return;
   }
 
   const activoId = ctx.establecimientoActivoId;
@@ -167,6 +174,8 @@ export async function mountVisitaForm(contenedor, ctx, id) {
     const fd = new FormData(e.target);
     const errorEl = document.getElementById('rodeo-form-error');
     errorEl.textContent = '';
+
+    if (!contextoSigueVigente(ctx, contextoAlMontar)) { errorEl.textContent = MENSAJE_CONTEXTO_CAMBIO; return; }
 
     const esSanitaria = fd.get('tipo') === 'sanitaria';
     const alcanceValor = fd.get('alcance');

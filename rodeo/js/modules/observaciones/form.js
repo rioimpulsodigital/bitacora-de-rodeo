@@ -1,6 +1,10 @@
 import { getObservacion, crearObservacion, actualizarObservacion, listVisitasParaSelector, listAnimalesParaSelector } from './services.js';
 import { escapeHtml } from '../../dashboard.js';
 import { etiquetaPaciente } from '../../services/paciente-label.js';
+import {
+  bloquearSiEsAjeno, capturarContexto, contextoSigueVigente, MENSAJE_CONTEXTO_CAMBIO,
+} from '../../services/contexto.js';
+import { puedeAccederModulo } from '../../services/permisos.js';
 
 function formatFecha(str) {
   if (!str) return '—';
@@ -19,6 +23,7 @@ const LABEL_TIPO = {
 
 export async function mountObservacionForm(contenedor, ctx, id) {
   contenedor.innerHTML = '<p class="rodeo-loading">Cargando…</p>';
+  const contextoAlMontar = capturarContexto(ctx); // BIT-70
 
   let observacion = null;
   if (id) {
@@ -32,14 +37,19 @@ export async function mountObservacionForm(contenedor, ctx, id) {
       contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">Observación no encontrada.</p></div>`;
       return;
     }
+    // BIT-70/F-02/F-03: no se edita una Observación de otro establecimiento
+    // ni se arma un formulario con una Observación de A y Visitas/Pacientes
+    // de B (BIT-63 ya lo protege en la base; esto mantiene coherente la UI).
+    if (bloquearSiEsAjeno(contenedor, ctx, observacion.establecimiento_id, { entidad: 'Observación de Campo', hrefVolver: '#observaciones' })) return;
   }
 
   const activoId = ctx.establecimientoActivoId;
+  const puedeVerVisitas = puedeAccederModulo(ctx.perfil, 'visitas');
 
   let visitas, animales;
   try {
     [visitas, animales] = await Promise.all([
-      listVisitasParaSelector(activoId),
+      puedeVerVisitas ? listVisitasParaSelector(activoId) : Promise.resolve([]),
       listAnimalesParaSelector(activoId),
     ]);
   } catch (e) {
@@ -78,8 +88,8 @@ export async function mountObservacionForm(contenedor, ctx, id) {
         <label class="form-label">Paciente Animal (opcional)</label>
         <select class="form-field" name="animal_id">${animalOpts}</select>
 
-        <label class="form-label">Visita relacionada (opcional)</label>
-        <select class="form-field" name="visita_id">${visitaOpts}</select>
+        ${puedeVerVisitas ? `<label class="form-label">Visita relacionada (opcional)</label>
+        <select class="form-field" name="visita_id">${visitaOpts}</select>` : ''}
 
         <div id="rodeo-form-error" class="rodeo-error"></div>
 
@@ -96,9 +106,11 @@ export async function mountObservacionForm(contenedor, ctx, id) {
     const errorEl = document.getElementById('rodeo-form-error');
     errorEl.textContent = '';
 
+    if (!contextoSigueVigente(ctx, contextoAlMontar)) { errorEl.textContent = MENSAJE_CONTEXTO_CAMBIO; return; }
+
     const campos = {
       establecimiento_id: activoId,
-      visita_id: fd.get('visita_id') || null,
+      visita_id: puedeVerVisitas ? (fd.get('visita_id') || null) : (observacion?.visita_id ?? null),
       descripcion: fd.get('descripcion') ?? '',
       animal_id: fd.get('animal_id') || null,
     };

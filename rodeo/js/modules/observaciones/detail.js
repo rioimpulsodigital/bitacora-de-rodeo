@@ -4,6 +4,7 @@
 import { getObservacion } from './services.js';
 import { escapeHtml } from '../../dashboard.js';
 import { etiquetaPaciente } from '../../services/paciente-label.js';
+import { bloquearSiEsAjeno } from '../../services/contexto.js';
 
 function formatFecha(str) {
   if (!str) return '—';
@@ -46,6 +47,10 @@ export async function mountObservacionDetail(contenedor, ctx, id) {
     contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">Observación no encontrada.</p><a href="#observaciones" class="rodeo-link-btn" style="margin-left:0">Volver al listado</a></div>`;
     return;
   }
+
+  // BIT-70/F-02: una Observación de otro establecimiento no se muestra desde
+  // el contexto activo.
+  if (bloquearSiEsAjeno(contenedor, ctx, observacion.establecimiento_id, { entidad: 'Observación de Campo', hrefVolver: '#observaciones' })) return;
 
   contenedor.innerHTML = `
     <div class="rodeo-card rodeo-ficha">

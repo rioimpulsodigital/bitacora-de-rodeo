@@ -10,6 +10,10 @@ import {
 } from './services.js';
 import { escapeHtml } from '../../dashboard.js';
 import { etiquetaPaciente } from '../../services/paciente-label.js';
+import {
+  bloquearSiEsAjeno, capturarContexto, contextoSigueVigente, MENSAJE_CONTEXTO_CAMBIO,
+} from '../../services/contexto.js';
+import { puedeEditarAtencion } from '../../services/permisos.js';
 
 // Una Visita es compatible con un Paciente si es una visita general (sin
 // lote_id, la mayoría de los tipos) o si su lote_id coincide con el lote
@@ -139,6 +143,7 @@ export async function mountAtencionForm(contenedor, ctx, id) {
   contenedor.innerHTML = '<p class="rodeo-loading">Cargando…</p>';
 
   const esEdicion = Boolean(id);
+  const contextoAlMontar = capturarContexto(ctx); // BIT-70
   const esAdmin = tieneRol(ctx.perfil, 'ADMINISTRADOR');
   const esProfesional = tieneRol(ctx.perfil, 'PROFESIONAL');
   const esOperadorCampo = tieneRol(ctx.perfil, 'OPERADOR_CAMPO');
@@ -164,6 +169,20 @@ export async function mountAtencionForm(contenedor, ctx, id) {
     if (esEdicion && !atencion) {
       contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">Atención no encontrada o sin acceso.</p></div>`;
       return;
+    }
+
+    if (esEdicion) {
+      // BIT-70/F-02/F-03: no se edita una Atención de otro establecimiento ni
+      // se arma un formulario con una Atención de A y Pacientes/Lotes/Visitas
+      // de B.
+      if (bloquearSiEsAjeno(contenedor, ctx, atencion.establecimiento_id, { entidad: 'Atención Clínica', hrefVolver: '#atenciones' })) return;
+      // BIT-70/F-05: la ruta del formulario replica el gate de edición del
+      // listado y del detalle (ADMINISTRADOR cualquiera; PROFESIONAL solo las
+      // propias).
+      if (!puedeEditarAtencion(ctx.perfil, atencion)) {
+        contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">No tenés permiso para editar esta Atención Clínica.</p><a href="#atenciones" class="rodeo-link-btn" style="margin-left:0">Volver al listado</a></div>`;
+        return;
+      }
     }
 
     // Retorno desde flujo "+ Nuevo Paciente"
@@ -385,6 +404,12 @@ export async function mountAtencionForm(contenedor, ctx, id) {
       const successEl = document.getElementById('atencion-success');
       errorEl.style.display = 'none';
       successEl.style.display = 'none';
+
+      if (!contextoSigueVigente(ctx, contextoAlMontar)) {
+        errorEl.textContent = MENSAJE_CONTEXTO_CAMBIO;
+        errorEl.style.display = '';
+        return;
+      }
 
       const campos = {
         establecimiento_id: ctx.establecimientoActivoId,

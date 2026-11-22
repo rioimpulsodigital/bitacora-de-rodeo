@@ -7,6 +7,7 @@
 // los suyos. Acá no se repite ese filtro.
 
 import { supabase } from '../../../js/core/supabase-client.js';
+import { validarEstablecimientoAccesible } from './contexto.js';
 
 const STORAGE_KEY = 'rodeo_establecimiento_activo';
 
@@ -63,10 +64,26 @@ export function tieneJornadaHabilitada(establecimientoId, capacidadesJornada, pe
   return capacidadesJornada?.get(establecimientoId) === true;
 }
 
+// Lectura CRUDA de lo persistido: es solo una preferencia del navegador, no
+// un permiso ni una prueba de autorización (BIT-70/F-04). Nunca usar este
+// valor directamente: pasarlo por resolverEstablecimientoActivo().
 export function getEstablecimientoActivoId() {
   return localStorage.getItem(STORAGE_KEY);
 }
 
-export function setEstablecimientoActivoId(id) {
-  localStorage.setItem(STORAGE_KEY, id);
+// Resuelve el establecimiento activo a partir de lo persistido, validándolo
+// contra la lista de establecimientos ACCESIBLES (ya filtrada por RLS). Si lo
+// persistido no pertenece a esa lista (manipulado, obsoleto o ajeno), se
+// descarta y se toma el primero accesible; sin accesibles, null.
+export function resolverEstablecimientoActivo(persistidoId, accesibles) {
+  return validarEstablecimientoAccesible(persistidoId, accesibles) ?? accesibles?.[0]?.id ?? null;
+}
+
+// Persiste el establecimiento activo SOLO si pertenece a los accesibles.
+// Devuelve true si lo fijó; false (sin tocar nada) si el id no es válido.
+export function fijarEstablecimientoActivo(id, accesibles) {
+  const valido = validarEstablecimientoAccesible(id, accesibles);
+  if (!valido) return false;
+  localStorage.setItem(STORAGE_KEY, valido);
+  return true;
 }
