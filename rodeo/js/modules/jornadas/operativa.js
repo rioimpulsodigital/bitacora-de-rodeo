@@ -28,6 +28,7 @@
 import { getJornadaActivaPropia, crearJornada, actualizarJornada } from '../../services/jornadas.js';
 import { tieneJornadaHabilitada } from '../../services/establecimientos.js';
 import { escapeHtml } from '../../dashboard.js';
+import { capturarContexto, contextoSigueVigente, MENSAJE_CONTEXTO_CAMBIO } from '../../services/contexto.js';
 
 // Zona operativa única (corrección de bug real, BIT-61): antes, la fecha
 // salía de `toISOString()` (UTC) y la hora de `toTimeString()` (zona del
@@ -86,6 +87,7 @@ function calcularDuracion(fecha, horaLlegada) {
 
 export async function mountJornadaOperativa(contenedor, ctx) {
   contenedor.innerHTML = '<p class="rodeo-loading">Cargando…</p>';
+  const contextoAlMontar = capturarContexto(ctx); // BIT-70
 
   let jornadaActiva;
   try {
@@ -188,6 +190,14 @@ export async function mountJornadaOperativa(contenedor, ctx) {
       btn.textContent = 'Registrando…';
       const errorEl = document.getElementById('jornada-error');
       errorEl.textContent = '';
+      // BIT-70: LLEGADA registra la Jornada en el establecimiento ACTIVO; si
+      // cambió desde que se montó esta pantalla, no se registra nada.
+      if (!contextoSigueVigente(ctx, contextoAlMontar)) {
+        errorEl.textContent = MENSAJE_CONTEXTO_CAMBIO;
+        btn.disabled = false;
+        btn.textContent = 'LLEGADA';
+        return;
+      }
       const { fecha, hora } = nowParts();
       try {
         await crearJornada(

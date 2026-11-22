@@ -9,6 +9,8 @@
 import { getAtencion } from './services.js';
 import { escapeHtml } from '../../dashboard.js';
 import { etiquetaPaciente } from '../../services/paciente-label.js';
+import { bloquearSiEsAjeno } from '../../services/contexto.js';
+import { puedeEditarAtencion } from '../../services/permisos.js';
 
 function toDateOnly(value) {
   if (!value) return '';
@@ -51,10 +53,13 @@ export async function mountAtencionDetail(contenedor, ctx, id) {
     return;
   }
 
-  // Mismo criterio de permiso de edición que atenciones/list.js.
-  const esAdmin = ctx.perfil.rol === 'ADMINISTRADOR';
-  const esProfesional = ctx.perfil.rol === 'PROFESIONAL';
-  const puedeEditar = esAdmin || (esProfesional && atencion.profesional_responsable_id === ctx.perfil.id);
+  // BIT-70/F-02: una Atención de otro establecimiento no se muestra desde el
+  // contexto activo.
+  if (bloquearSiEsAjeno(contenedor, ctx, atencion.establecimiento_id, { entidad: 'Atención Clínica', hrefVolver: '#atenciones' })) return;
+
+  // Mismo criterio de permiso de edición que atenciones/list.js. Regla única
+  // en services/permisos.js (BIT-70).
+  const puedeEditar = puedeEditarAtencion(ctx.perfil, atencion);
 
   contenedor.innerHTML = `
     <div class="rodeo-card rodeo-ficha">

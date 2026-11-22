@@ -1,8 +1,12 @@
 import { getLote, crearLote, actualizarLote } from './services.js';
 import { escapeHtml } from '../../dashboard.js';
+import {
+  bloquearSiEsAjeno, capturarContexto, contextoSigueVigente, MENSAJE_CONTEXTO_CAMBIO,
+} from '../../services/contexto.js';
 
 export async function mountLoteForm(contenedor, ctx, id) {
   contenedor.innerHTML = '<p class="rodeo-loading">Cargando…</p>';
+  const contextoAlMontar = capturarContexto(ctx); // BIT-70
 
   let lote = null;
   if (id) {
@@ -16,6 +20,8 @@ export async function mountLoteForm(contenedor, ctx, id) {
       contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">Lote no encontrado.</p></div>`;
       return;
     }
+    // BIT-70/F-02: un Lote de otro establecimiento no se edita desde el activo.
+    if (bloquearSiEsAjeno(contenedor, ctx, lote.establecimiento_id, { entidad: 'Lote', hrefVolver: '#animales/lotes', textoVolver: 'Volver a Lotes' })) return;
   }
 
   contenedor.innerHTML = `
@@ -43,10 +49,12 @@ export async function mountLoteForm(contenedor, ctx, id) {
     const errorEl = document.getElementById('rodeo-form-error');
     errorEl.textContent = '';
 
+    if (!contextoSigueVigente(ctx, contextoAlMontar)) { errorEl.textContent = MENSAJE_CONTEXTO_CAMBIO; return; }
+
     const campos = {
       nombre: fd.get('nombre'),
       notas: fd.get('notas'),
-      establecimiento_id: ctx.establecimientoActivoId,
+      establecimiento_id: lote?.establecimiento_id ?? ctx.establecimientoActivoId,
     };
 
     if (!campos.nombre?.trim()) {

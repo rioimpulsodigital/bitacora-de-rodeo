@@ -7,10 +7,41 @@ import { supabase } from '../../../../js/core/supabase-client.js';
 
 // ── Personas (Tutores Responsables) ────────────────────────────
 
-export async function listPersonas() {
+// Tutores que se ofrecen en el formulario de Paciente (BIT-70 — 03).
+//
+// `personas` no tiene establecimiento_id: el vínculo con un establecimiento
+// vive en `personas_establecimientos` (relación N:M por diseño: PK
+// (persona_id, establecimiento_id)), y la policy personas_select deja ver a
+// cualquier usuario TODA persona vinculada a ALGÚN establecimiento al que
+// tenga acceso -- no solo al activo. Sin este filtro, quien trabaja en B veía
+// (y podía asignar) Tutores vinculados únicamente a A. Alcance documentado de
+// BIT-07: «filtrado por establecimiento activo en todas las consultas».
+//
+// Se ofrecen los Tutores vinculados al establecimiento ACTIVO (un Tutor
+// vinculado a varios establecimientos aparece en cada uno). `incluirIds`
+// conserva los que ya están asociados al registro que se edita (p. ej. el
+// Tutor actual del Paciente) aunque no tengan vínculo con el activo: quitarlo
+// del selector lo dejaría en "No informado" y el guardado lo anularía.
+// Sin establecimiento activo no hay contexto: no se ofrece ningún Tutor.
+// Dos consultas simples en vez de un embed `!inner` (BIT-46/H1).
+export async function listPersonas(establecimientoId, { incluirIds = [] } = {}) {
+  const ids = new Set(incluirIds.filter(Boolean));
+
+  if (establecimientoId) {
+    const { data: vinculos, error: errVinculos } = await supabase
+      .from('personas_establecimientos')
+      .select('persona_id')
+      .eq('establecimiento_id', establecimientoId);
+    if (errVinculos) throw errVinculos;
+    for (const v of vinculos ?? []) ids.add(v.persona_id);
+  }
+
+  if (ids.size === 0) return [];
+
   const { data, error } = await supabase
     .from('personas')
     .select('id, nombre')
+    .in('id', [...ids])
     .order('nombre');
   if (error) throw error;
   return data;

@@ -6,6 +6,7 @@
 import { getAnimal, getFotoUrlFirmada } from './services.js';
 import { LABEL_ESPECIE, LABEL_SEXO, tituloPaciente } from './labels.js';
 import { escapeHtml } from '../../dashboard.js';
+import { bloquearSiEsAjeno } from '../../services/contexto.js';
 
 const NO_INFORMADO = 'No informado';
 
@@ -32,6 +33,10 @@ export async function mountAnimalDetail(contenedor, ctx, id) {
     contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">Paciente no encontrado.</p><a href="#animales" class="rodeo-link-btn" style="margin-left:0">Volver al listado</a></div>`;
     return;
   }
+
+  // BIT-70/F-02: un Paciente de otro establecimiento no se muestra desde el
+  // contexto activo (ni siquiera para quien tiene acceso legítimo a ambos).
+  if (bloquearSiEsAjeno(contenedor, ctx, animal.establecimiento_actual_id, { entidad: 'Paciente', hrefVolver: '#animales' })) return;
 
   const puedeEditar = ctx.perfil?.rol !== 'OPERADOR_CAMPO';
   // Mismo origen que el selector del header (ya filtrado por RLS): no se

@@ -7,6 +7,8 @@
 import { getNovedad, tipoLabel } from './services.js';
 import { escapeHtml } from '../../dashboard.js';
 import { etiquetaPaciente } from '../../services/paciente-label.js';
+import { bloquearSiEsAjeno } from '../../services/contexto.js';
+import { puedeEditarNovedad } from '../../services/permisos.js';
 
 function campo(etiqueta, valor, { vacio = 'No informado' } = {}) {
   const hayValor = valor !== null && valor !== undefined && String(valor).trim() !== '';
@@ -32,10 +34,14 @@ export async function mountNovedadDetail(contenedor, ctx, id) {
     return;
   }
 
+  // BIT-70/F-02: una Novedad de otro establecimiento no se muestra desde el
+  // contexto activo.
+  if (bloquearSiEsAjeno(contenedor, ctx, novedad.establecimiento_id, { entidad: 'Novedad', hrefVolver: '#novedades' })) return;
+
   // Mismo criterio de permiso de edición que novedades/list.js -- Ver no
-  // amplía quién puede editar, solo quién puede consultar.
-  const esAdminOProfesional = ctx.perfil.rol === 'ADMINISTRADOR' || ctx.perfil.rol === 'PROFESIONAL';
-  const puedeEditar = esAdminOProfesional || novedad.created_by === ctx.perfil.id;
+  // amplía quién puede editar, solo quién puede consultar. Regla única en
+  // services/permisos.js (BIT-70).
+  const puedeEditar = puedeEditarNovedad(ctx.perfil, novedad);
 
   contenedor.innerHTML = `
     <div class="rodeo-card rodeo-ficha">

@@ -7,13 +7,16 @@ import { getPerfilActual } from './services/perfiles.js';
 import {
   getEstablecimientosAccesibles,
   getEstablecimientoActivoId,
-  setEstablecimientoActivoId,
+  resolverEstablecimientoActivo,
+  fijarEstablecimientoActivo,
   tieneCatastroEquino,
   getCapacidadesJornada,
   tieneJornadaHabilitada,
 } from './services/establecimientos.js';
+import { crearTransicionEstablecimiento } from './services/transicion-establecimiento.js';
+import { puedeAccederModulo } from './services/permisos.js';
 import { renderHeaderUsuario, renderHeaderEstablecimiento, renderSinPerfil, mountDashboard } from './dashboard.js';
-import { registerRoute, iniciarRouter, resolverRuta } from './router.js';
+import { registerRoute, iniciarRouter } from './router.js';
 import { registrarRutasJornadas } from './modules/jornadas/index.js';
 import { registrarRutasAnimales } from './modules/animales/index.js';
 import { registrarRutasCatastro } from './modules/catastro/index.js';
@@ -50,11 +53,11 @@ async function iniciar() {
   const capacidadesJornada = await getCapacidadesJornada(perfil.id);
 
   renderHeaderUsuario(perfil, handleSignOut);
-  let activoId = getEstablecimientoActivoId();
-  if (!activoId || !establecimientos.some((e) => e.id === activoId)) {
-    activoId = establecimientos[0]?.id ?? null;
-    if (activoId) setEstablecimientoActivoId(activoId);
-  }
+  // BIT-70/F-04: lo persistido en localStorage es solo una preferencia del
+  // navegador, no un permiso. Se valida SIEMPRE contra los establecimientos
+  // accesibles (RLS) antes de usarlo; un valor ajeno o manipulado se descarta.
+  let activoId = resolverEstablecimientoActivo(getEstablecimientoActivoId(), establecimientos);
+  if (activoId) fijarEstablecimientoActivo(activoId, establecimientos);
 
   // ctx.establecimientoActivoId siempre lee el valor vigente — las vistas
   // que lo necesiten (hoy solo Dashboard) lo ven actualizado sin recargar.
@@ -85,32 +88,29 @@ async function iniciar() {
   }
   actualizarNavJornadas();
 
-  renderHeaderEstablecimiento(establecimientos, activoId, (id) => {
-    activoId = id;
-    setEstablecimientoActivoId(id);
-    actualizarNavCatastro();
-    actualizarNavJornadas();
-
-    // BIT-61 (corrección de UX, Bren/KLIAM): si la vista actual es del
-    // módulo Jornada (operativa, historial o cualquier subruta) y el
-    // establecimiento recién elegido no tiene la capacidad habilitada
-    // para este usuario, no tiene sentido volver a resolver esa misma
-    // ruta -- operativa.js la rechazaría mostrando el mensaje de "Jornada
-    // no está disponible para vos en X", que es la protección correcta
-    // para quien escribe #jornadas a mano, pero una mala experiencia para
-    // un cambio normal de establecimiento desde el selector. Se sale a
-    // una vista segura (#dashboard) en vez de dejar al usuario mirando
-    // ese rechazo. El gate real de seguridad sigue intacto en
-    // operativa.js -- esto es solo navegación, nunca lo reemplaza.
-    const moduloActual = location.hash.slice(1).split('/')[0];
-    if (moduloActual === 'jornadas' && !tieneJornadaHabilitada(activoId, capacidadesJornada, perfil)) {
-      location.hash = '#dashboard'; // dispara hashchange -> resolverRuta()
-    } else {
-      resolverRuta();
-    }
+  // BIT-70/F-01: el cambio de establecimiento es una TRANSICIÓN, no una
+  // simple actualización de variable: se valida el destino, se invalida la
+  // vista anterior (contenedor, guardados pendientes, claves de sesión
+  // transitorias), se vuelve a Dashboard y se recarga la aplicación para
+  // descartar memoria, listeners y consultas en vuelo del contexto previo.
+  // Reemplaza al esquema anterior (actualizar variable + volver a resolver
+  // el mismo hash), que dejaba datos del establecimiento anterior en
+  // pantalla y permitía respuestas tardías sobre el contexto nuevo. Además
+  // elimina la necesidad del redireccionamiento especial de Jornadas
+  // (BIT-61): siempre se aterriza en Dashboard. Las guardas reales de cada
+  // ruta (capacidad de Jornada, Catastro, contexto por entidad) no cambian.
+  const contenedor = document.getElementById('rodeo-content');
+  const cambiarEstablecimiento = crearTransicionEstablecimiento({
+    establecimientos,
+    contenedor,
+    obtenerActivoId: () => activoId,
+    aplicarActivoId: (id) => { activoId = id; },
+    persistir: (id) => fijarEstablecimientoActivo(id, establecimientos),
   });
 
-  const contenedor = document.getElementById('rodeo-content');
+  renderHeaderEstablecimiento(establecimientos, activoId, (id) => {
+    cambiarEstablecimiento(id, document.getElementById('rodeo-establecimiento-select'));
+  });
   registerRoute('dashboard', () => mountDashboard(contenedor, ctx));
   registrarRutasJornadas(contenedor, ctx);
   registrarRutasAnimales(contenedor, ctx);
@@ -125,6 +125,16 @@ async function iniciar() {
   // Papelera: solo ADMINISTRADOR ve la entrada (la restricción real es server-side).
   if (perfil.rol === 'ADMINISTRADOR') {
     document.getElementById('rodeo-nav-papelera').style.display = '';
+  }
+
+  // BIT-70/F-05: navegación coherente con la matriz de roles vigente
+  // (services/permisos.js). Ocultar el enlace es solo navegación: cada ruta
+  // del módulo se bloquea además por hash directo y RLS es la frontera real.
+  for (const modulo of ['visitas', 'atenciones']) {
+    if (!puedeAccederModulo(perfil, modulo)) {
+      const enlace = document.querySelector(`#rodeo-sidebar [data-view="${modulo}"]`);
+      if (enlace) enlace.style.display = 'none';
+    }
   }
 
   iniciarRouter('dashboard');
