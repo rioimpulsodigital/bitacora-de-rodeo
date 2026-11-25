@@ -33,3 +33,8 @@ export function puedeEditarNovedad(perfil, novedad) {
   if (perfil?.rol === 'ADMINISTRADOR' || perfil?.rol === 'PROFESIONAL') return true;
   return Boolean(perfil?.id) && novedad?.created_by === perfil.id;
 }
+
+// BIT-70-20/R-04: la misma matriz que las policies de lotes y membresias.
+export function puedeGestionarLotes(perfil) {
+  return perfil?.rol === 'ADMINISTRADOR' || perfil?.rol === 'PROFESIONAL';
+}

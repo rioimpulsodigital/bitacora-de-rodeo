@@ -3,10 +3,11 @@
 // NO es la Ficha Clínica de BIT-38 (código PAC-XXXXX, historial, Atenciones,
 // Observaciones, evolución) -- eso queda fuera a propósito.
 
-import { getAnimal, getFotoUrlFirmada } from './services.js';
+import { getAnimal, getFotoUrlFirmada, trasladarPaciente } from './services.js';
 import { LABEL_ESPECIE, LABEL_SEXO, tituloPaciente } from './labels.js';
 import { escapeHtml } from '../../dashboard.js';
-import { bloquearSiEsAjeno } from '../../services/contexto.js';
+import { bloquearSiEsAjeno, capturarContexto, contextoSigueVigente, MENSAJE_CONTEXTO_CAMBIO } from '../../services/contexto.js';
+import { puedeGestionarLotes } from '../../services/permisos.js';
 
 const NO_INFORMADO = 'No informado';
 
@@ -21,6 +22,7 @@ function campo(etiqueta, valor, { vacio = NO_INFORMADO } = {}) {
 
 export async function mountAnimalDetail(contenedor, ctx, id) {
   contenedor.innerHTML = '<p class="rodeo-loading">Cargando…</p>';
+  const contextoAlMontar = capturarContexto(ctx);
 
   let animal;
   try {
@@ -42,6 +44,9 @@ export async function mountAnimalDetail(contenedor, ctx, id) {
   // Mismo origen que el selector del header (ya filtrado por RLS): no se
   // agrega una consulta ni un join extra sobre `establecimientos`.
   const establecimiento = ctx.establecimientos.find((e) => e.id === animal.establecimiento_actual_id);
+  const destinos = puedeGestionarLotes(ctx.perfil)
+    ? ctx.establecimientos.filter((e) => e.id !== animal.establecimiento_actual_id)
+    : [];
 
   contenedor.innerHTML = `
     <div class="rodeo-card rodeo-ficha">
@@ -69,10 +74,47 @@ export async function mountAnimalDetail(contenedor, ctx, id) {
       </div>
       ${animal.notas ? `<div class="rodeo-ficha-campo"><span class="form-label">Notas</span><div style="white-space:pre-wrap">${escapeHtml(animal.notas)}</div></div>` : ''}
 
+      ${destinos.length ? `<div class="rodeo-ficha-campo" style="margin-top:16px">
+        <label class="form-label" for="rodeo-traslado-destino">Trasladar a otro establecimiento</label>
+        <select class="form-field" id="rodeo-traslado-destino">
+          <option value="">Seleccionar destino…</option>
+          ${destinos.map((e) => `<option value="${e.id}">${escapeHtml(e.nombre)}</option>`).join('')}
+        </select>
+        <p class="rodeo-hint">Se cierra el Lote activo. El Tutor se conserva si ya está vinculado al destino.</p>
+        <button type="button" class="rodeo-btn" id="rodeo-trasladar-paciente">Trasladar Paciente</button>
+        <div class="rodeo-error" id="rodeo-traslado-error"></div>
+      </div>` : ''}
+
       <div class="rodeo-form-acciones" style="margin-top:16px">
         <a href="#animales" class="rodeo-link-btn" style="margin-left:0">Volver al listado</a>
       </div>
     </div>`;
+
+  if (destinos.length) {
+    const boton = document.getElementById('rodeo-trasladar-paciente');
+    const selector = document.getElementById('rodeo-traslado-destino');
+    const errorEl = document.getElementById('rodeo-traslado-error');
+    boton.addEventListener('click', async () => {
+      errorEl.textContent = '';
+      if (!contextoSigueVigente(ctx, contextoAlMontar)) {
+        errorEl.textContent = MENSAJE_CONTEXTO_CAMBIO;
+        return;
+      }
+      const destino = destinos.find((e) => e.id === selector.value);
+      if (!destino) { errorEl.textContent = 'Elegí un destino.'; return; }
+      if (!window.confirm(`¿Trasladar este Paciente a ${destino.nombre}? Se cerrará su Lote activo.`)) return;
+      boton.disabled = true;
+      boton.textContent = 'Trasladando…';
+      try {
+        await trasladarPaciente(animal, destino.id);
+        contenedor.innerHTML = `<div class="rodeo-card"><p>Paciente trasladado a ${escapeHtml(destino.nombre)}.</p><p>Seleccioná el establecimiento destino en el encabezado para verlo.</p><a href="#animales" class="rodeo-link-btn">Volver al listado</a></div>`;
+      } catch (err) {
+        errorEl.textContent = 'No se pudo trasladar: ' + err.message;
+        boton.disabled = false;
+        boton.textContent = 'Trasladar Paciente';
+      }
+    });
+  }
 
   // La foto se resuelve DESPUÉS de dibujar la ficha: si Storage tarda o
   // falla, el resto de los datos ya está visible.

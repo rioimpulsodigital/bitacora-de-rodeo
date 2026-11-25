@@ -1,10 +1,15 @@
 import { getLote, crearLote, actualizarLote } from './services.js';
 import { escapeHtml } from '../../dashboard.js';
+import { puedeGestionarLotes } from '../../services/permisos.js';
 import {
   bloquearSiEsAjeno, capturarContexto, contextoSigueVigente, MENSAJE_CONTEXTO_CAMBIO,
 } from '../../services/contexto.js';
 
 export async function mountLoteForm(contenedor, ctx, id) {
+  if (!puedeGestionarLotes(ctx.perfil)) {
+    contenedor.innerHTML = '<div class="rodeo-card"><p class="rodeo-error">No tenés permiso para gestionar Lotes.</p></div>';
+    return;
+  }
   contenedor.innerHTML = '<p class="rodeo-loading">Cargando…</p>';
   const contextoAlMontar = capturarContexto(ctx); // BIT-70
 
