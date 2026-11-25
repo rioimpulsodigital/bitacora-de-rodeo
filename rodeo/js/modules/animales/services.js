@@ -231,10 +231,10 @@ export function validarFoto(file) {
 // que permite subir la foto ANTES de confirmar nada, ver
 // reemplazarFotoPaciente más abajo). Devuelve el PATH (object key), nunca
 // una URL -- el bucket es privado.
-async function subirFotoPaciente(establecimientoId, file) {
+async function subirFotoPaciente(establecimientoId, file, animalId = null) {
   const extCruda = (file.name.split('.').pop() || 'jpg').toLowerCase();
   const ext = /^[a-z0-9]{1,5}$/.test(extCruda) ? extCruda : 'jpg';
-  const path = `${establecimientoId}/${crypto.randomUUID()}.${ext}`;
+  const path = `${establecimientoId}/${animalId ? `${animalId}/` : ''}${crypto.randomUUID()}.${ext}`;
 
   const { error } = await supabase.storage
     .from(BUCKET_FOTOS)
@@ -256,6 +256,66 @@ async function limpiarFotoHuerfana(path) {
     await supabase.storage.from(BUCKET_FOTOS).remove([path]);
   } catch {
     // silencioso a propósito -- ver comentario arriba.
+  }
+}
+
+// BIT-70-20/R-02. La copia se sube por Storage API antes de confirmar la
+// transaccion de traslado. El path viejo se borra solo despues de la RPC.
+// Si se pierde la respuesta de la RPC, se consulta la fila antes de decidir
+// si la copia nueva es huerfana: nunca se borra una foto posiblemente activa.
+export async function trasladarPaciente(animal, destinoId) {
+  const origenId = animal.establecimiento_actual_id;
+  const fotoOrigen = animal.foto_path ?? null;
+  let fotoDestino = null;
+  if (fotoOrigen) {
+    const { data: blob, error } = await supabase.storage.from(BUCKET_FOTOS).download(fotoOrigen);
+    if (error) throw error;
+    const ext = fotoOrigen.split('.').pop()?.toLowerCase() || 'jpg';
+    const nombre = `traslado.${/^[a-z0-9]{1,5}$/.test(ext) ? ext : 'jpg'}`;
+    fotoDestino = await subirFotoPaciente(destinoId, new File([blob], nombre, {
+      type: blob.type || 'image/jpeg',
+    }), animal.id);
+  }
+
+  let fotoAnterior;
+  try {
+    const { data, error } = await supabase.rpc('bit70_trasladar_paciente', {
+      p_animal_id: animal.id,
+      p_origen_id: origenId,
+      p_destino_id: destinoId,
+      p_foto_origen_path: fotoOrigen,
+      p_foto_destino_path: fotoDestino,
+    });
+    if (error) throw error;
+    fotoAnterior = data;
+  } catch (err) {
+    let confirmado = false;
+    try {
+      const actual = await getAnimal(animal.id);
+      confirmado = actual?.establecimiento_actual_id === destinoId
+        && (actual.foto_path ?? null) === fotoDestino;
+      // Una fila invisible por RLS no prueba que la RPC haya fallado: pudo
+      // confirmar y perderse el acceso al destino antes de esta lectura.
+      // Solo compensar cuando la fila visible sigue en el origen y no usa
+      // la copia. Ante incertidumbre, conservar la foto para conciliación.
+      if (!confirmado && fotoDestino && actual?.establecimiento_actual_id === origenId
+          && actual.foto_path !== fotoDestino) {
+        await limpiarFotoHuerfana(fotoDestino);
+      }
+    } catch {
+      // Estado incierto: conservar la copia para evitar perdida de foto.
+    }
+    if (!confirmado) throw err;
+    fotoAnterior = fotoOrigen;
+  }
+
+  if (fotoAnterior) {
+    try {
+      const { error } = await supabase.storage.from(BUCKET_FOTOS).remove([fotoAnterior]);
+      if (error) throw error;
+    } catch (err) {
+      console.error('[Paciente] traslado confirmado; foto anterior huerfana:', err);
+    }
   }
 }
 

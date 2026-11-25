@@ -6,6 +6,7 @@ import {
 } from './services.js';
 import { SEXO_OPTS } from './labels.js';
 import { escapeHtml } from '../../dashboard.js';
+import { puedeGestionarLotes } from '../../services/permisos.js';
 import {
   bloquearSiEsAjeno, capturarContexto, contextoSigueVigente, MENSAJE_CONTEXTO_CAMBIO,
 } from '../../services/contexto.js';
@@ -21,6 +22,7 @@ const ESPECIES = [
 ];
 
 export async function mountAnimalForm(contenedor, ctx, id) {
+  const puedeAsignarLote = puedeGestionarLotes(ctx.perfil);
   contenedor.innerHTML = '<p class="rodeo-loading">Cargando…</p>';
   // BIT-70: contexto con el que se monta la pantalla; se vuelve a comprobar
   // antes de persistir.
@@ -57,7 +59,7 @@ export async function mountAnimalForm(contenedor, ctx, id) {
       // BIT-70 — 03: solo Tutores vinculados al establecimiento activo, más
       // el Tutor ya asociado al Paciente que se edita (no se anula en silencio).
       listPersonas(ctx.establecimientoActivoId, { incluirIds: [animal?.tutor_responsable_id] }),
-      listLotes(ctx.establecimientoActivoId),
+      puedeAsignarLote ? listLotes(ctx.establecimientoActivoId) : Promise.resolve([]),
     ]);
   } catch (e) {
     contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">Error al cargar datos: ${escapeHtml(e.message)}</p></div>`;
@@ -163,10 +165,8 @@ export async function mountAnimalForm(contenedor, ctx, id) {
           <div id="rodeo-tutor-error" class="rodeo-error" style="margin-top:6px"></div>
         </div>
 
-        <label class="form-label" style="margin-top:16px">Lote (opcional)</label>
-        <select class="form-field" name="lote_id">
-          ${lotesOpts}
-        </select>
+        ${puedeAsignarLote ? `<label class="form-label" style="margin-top:16px">Lote (opcional)</label>
+        <select class="form-field" name="lote_id">${lotesOpts}</select>` : ''}
 
         <div id="rodeo-form-error" class="rodeo-error"></div>
 
@@ -343,7 +343,7 @@ export async function mountAnimalForm(contenedor, ctx, id) {
       errorEl.textContent = 'La edad aproximada debe estar entre 0 y 60 años.'; return;
     }
 
-    const loteId = fd.get('lote_id') || null;
+    const loteId = puedeAsignarLote ? (fd.get('lote_id') || null) : null;
 
     // BIT-70 — 03: no se persisten relaciones con registros que la pantalla
     // no ofreció (Tutor o Lote de otro establecimiento).
@@ -369,7 +369,7 @@ export async function mountAnimalForm(contenedor, ctx, id) {
     try {
       if (animal) {
         await actualizarAnimal(animal.id, campos);
-        await actualizarLoteDeAnimal(animal.id, loteId);
+        if (puedeAsignarLote) await actualizarLoteDeAnimal(animal.id, loteId);
         // La foto se reemplaza DESPUÉS de guardar el resto de los datos, en
         // un paso aparte: si falla, el Paciente ya quedó guardado
         // correctamente -- nunca se corrompe por un problema de la foto.
@@ -384,7 +384,7 @@ export async function mountAnimalForm(contenedor, ctx, id) {
         location.hash = '#animales';
       } else {
         const nuevo = await crearAnimal(campos, fotoFile);
-        if (loteId) await actualizarLoteDeAnimal(nuevo.id, loteId);
+        if (puedeAsignarLote && loteId) await actualizarLoteDeAnimal(nuevo.id, loteId);
         const returnTo = sessionStorage.getItem('_atenciones_return');
         if (returnTo) {
           sessionStorage.setItem('_atenciones_animal_id', nuevo.id);
