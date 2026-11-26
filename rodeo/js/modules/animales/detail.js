@@ -6,6 +6,7 @@
 import { getAnimal, getFotoUrlFirmada, trasladarPaciente } from './services.js';
 import { LABEL_ESPECIE, LABEL_SEXO, tituloPaciente } from './labels.js';
 import { escapeHtml } from '../../dashboard.js';
+import { puedeEditarPaciente } from '../../services/permisos.js';
 import { bloquearSiEsAjeno, capturarContexto, contextoSigueVigente, MENSAJE_CONTEXTO_CAMBIO } from '../../services/contexto.js';
 import { puedeGestionarLotes } from '../../services/permisos.js';
 
@@ -40,7 +41,7 @@ export async function mountAnimalDetail(contenedor, ctx, id) {
   // contexto activo (ni siquiera para quien tiene acceso legítimo a ambos).
   if (bloquearSiEsAjeno(contenedor, ctx, animal.establecimiento_actual_id, { entidad: 'Paciente', hrefVolver: '#animales' })) return;
 
-  const puedeEditar = ctx.perfil?.rol !== 'OPERADOR_CAMPO';
+  const puedeEditar = puedeEditarPaciente(ctx.perfil);
   // Mismo origen que el selector del header (ya filtrado por RLS): no se
   // agrega una consulta ni un join extra sobre `establecimientos`.
   const establecimiento = ctx.establecimientos.find((e) => e.id === animal.establecimiento_actual_id);

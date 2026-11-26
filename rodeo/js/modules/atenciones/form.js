@@ -7,6 +7,10 @@ import {
   getLoteActivoAnimal,
   crearAtencion,
   actualizarAtencion,
+  crearBorradorAtencion,
+  actualizarBorradorAtencion,
+  enviarAtencion,
+  getValidador,
 } from './services.js';
 import { escapeHtml } from '../../dashboard.js';
 import { etiquetaPaciente } from '../../services/paciente-label.js';
@@ -146,15 +150,15 @@ export async function mountAtencionForm(contenedor, ctx, id) {
   const contextoAlMontar = capturarContexto(ctx); // BIT-70
   const esAdmin = tieneRol(ctx.perfil, 'ADMINISTRADOR');
   const esProfesional = tieneRol(ctx.perfil, 'PROFESIONAL');
-  const esOperadorCampo = tieneRol(ctx.perfil, 'OPERADOR_CAMPO');
+  const esAsistente = tieneRol(ctx.perfil, 'ASISTENTE_VETERINARIO');
 
-  if (esOperadorCampo) {
+  if (!esAdmin && !esProfesional && !esAsistente) {
     contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">No tenés acceso a Atenciones Clínicas.</p></div>`;
     return;
   }
 
-  if (!esEdicion && !esProfesional) {
-    contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">Solo usuarios con rol Profesional pueden crear Atenciones Clínicas.</p></div>`;
+  if (!esEdicion && !esProfesional && !esAsistente) {
+    contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">No tenés permiso para crear Atenciones Clínicas.</p></div>`;
     return;
   }
 
@@ -163,7 +167,7 @@ export async function mountAtencionForm(contenedor, ctx, id) {
       esEdicion ? getAtencion(id) : Promise.resolve(null),
       listAnimalesParaSelector(ctx.establecimientoActivoId),
       listLotesParaSelector(ctx.establecimientoActivoId),
-      listVisitasParaSelector(ctx.establecimientoActivoId),
+      esAsistente ? Promise.resolve([]) : listVisitasParaSelector(ctx.establecimientoActivoId),
     ]);
 
     if (esEdicion && !atencion) {
@@ -216,8 +220,12 @@ export async function mountAtencionForm(contenedor, ctx, id) {
     // - Edición: muestra el profesional original como lectura, no permite cambiarlo.
     let profesionalNombre, profesionalId;
     if (esEdicion) {
-      profesionalNombre = atencion?.perfiles?.nombre ?? '—';
+      profesionalNombre = atencion?.perfiles?.nombre ?? (esAsistente ? 'Profesional designado' : '—');
       profesionalId = atencion?.profesional_responsable_id ?? '';
+    } else if (esAsistente) {
+      profesionalId = await getValidador(ctx.establecimientoActivoId);
+      if (!profesionalId) throw new Error('No hay PROFESIONAL responsable habilitado y designado para este establecimiento.');
+      profesionalNombre = 'PROFESIONAL responsable y validador del establecimiento';
     } else {
       profesionalNombre = ctx.perfil.nombre;
       profesionalId = ctx.perfil.id;
@@ -266,10 +274,10 @@ export async function mountAtencionForm(contenedor, ctx, id) {
             ${lotesOpts}
           </select>
 
-          <label class="form-label">Visita de terreno relacionada (opcional)</label>
+          ${esAsistente ? '' : `<label class="form-label">Visita de terreno relacionada (opcional)</label>
           <select class="form-field" name="visita_id" id="atencion-visita">
             ${visitasOpts}
-          </select>
+          </select>`}
 
           ${profesionalHtml}
 
@@ -316,8 +324,9 @@ export async function mountAtencionForm(contenedor, ctx, id) {
 
           <div class="rodeo-form-acciones">
             <button type="submit" class="rodeo-btn rodeo-btn-primary" id="atencion-submit">
-              ${esEdicion ? 'Guardar cambios' : 'Guardar atención'}
+              ${esAsistente ? 'Guardar borrador' : (esEdicion ? 'Guardar cambios' : 'Guardar atención')}
             </button>
+            ${esAsistente && esEdicion ? '<button type="button" class="rodeo-btn" id="atencion-enviar">Enviar a revisión</button>' : ''}
             <a href="#atenciones" class="rodeo-link-btn">Volver al listado</a>
           </div>
         </form>
@@ -331,7 +340,7 @@ export async function mountAtencionForm(contenedor, ctx, id) {
     const visitaSelect = document.getElementById('atencion-visita');
     const formEl = document.getElementById('atencion-form');
     const submitBtn = document.getElementById('atencion-submit');
-    const textoBotonNormal = esEdicion ? 'Guardar cambios' : 'Guardar atención';
+    const textoBotonNormal = esAsistente ? 'Guardar borrador' : (esEdicion ? 'Guardar cambios' : 'Guardar atención');
 
     // Estado del botón: 'pristine' (sin cambios) | 'dirty' (hay cambios) |
     // 'saving' | 'saved'. Arranca siempre 'pristine' -- precargar valores
@@ -385,7 +394,7 @@ export async function mountAtencionForm(contenedor, ctx, id) {
       // con forceIncludeSelected=false, si hay lote activo queda forzado
       // como único valor dentro de construirLoteOpts.
       lotesSelect.innerHTML = construirLoteOpts(lotes, nuevoLoteActivo, '', false);
-      visitaSelect.innerHTML = construirVisitaOpts(visitas, nuevoLoteActivo, '', false);
+      if (visitaSelect) visitaSelect.innerHTML = construirVisitaOpts(visitas, nuevoLoteActivo, '', false);
     });
 
     const btnNuevo = document.getElementById('btn-nuevo-paciente');
@@ -396,6 +405,22 @@ export async function mountAtencionForm(contenedor, ctx, id) {
         location.hash = '#animales/nuevo';
       });
     }
+
+    const btnEnviar = document.getElementById('atencion-enviar');
+    if (btnEnviar) btnEnviar.addEventListener('click', async () => {
+      const errEl = document.getElementById('atencion-error');
+      errEl.style.display = 'none';
+      if (!contextoSigueVigente(ctx, contextoAlMontar)) {
+        errEl.textContent = MENSAJE_CONTEXTO_CAMBIO; errEl.style.display = ''; return;
+      }
+      if (estadoBoton === 'dirty') {
+        errEl.textContent = 'Guardá los cambios antes de enviar a revisión.';
+        errEl.style.display = ''; return;
+      }
+      btnEnviar.disabled = true;
+      try { await enviarAtencion(id); location.hash = `#atenciones/ver/${id}`; }
+      catch (err) { errEl.textContent = err.message; errEl.style.display = ''; btnEnviar.disabled = false; }
+    });
 
     formEl.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -415,7 +440,7 @@ export async function mountAtencionForm(contenedor, ctx, id) {
         establecimiento_id: ctx.establecimientoActivoId,
         animal_id: fd.get('animal_id') || null,
         lote_id: fd.get('lote_id') || null,
-        visita_id: fd.get('visita_id') || null,
+        visita_id: esAsistente ? null : fd.get('visita_id') || null,
         profesional_responsable_id: fd.get('profesional_responsable_id') || null,
         fecha: fd.get('fecha'),
         hora: fd.get('hora'),
@@ -434,22 +459,28 @@ export async function mountAtencionForm(contenedor, ctx, id) {
 
       if (!campos.animal_id) return showError('El Paciente Animal es obligatorio.');
       if (!campos.profesional_responsable_id) return showError('El Profesional responsable es obligatorio.');
-      if (!campos.fecha) return showError('La fecha es obligatoria.');
-      if (!campos.hora) return showError('La hora es obligatoria.');
-      if (!campos.motivo.trim()) return showError('El motivo de consulta es obligatorio.');
-      if (!campos.antecedentes.trim()) return showError('Los antecedentes son obligatorios.');
-      if (!campos.diagnostico.trim()) return showError('El diagnóstico es obligatorio.');
+      if (!esAsistente && !campos.fecha) return showError('La fecha es obligatoria.');
+      if (!esAsistente && !campos.hora) return showError('La hora es obligatoria.');
+      if (!esAsistente && !campos.motivo.trim()) return showError('El motivo de consulta es obligatorio.');
+      if (!esAsistente && !campos.antecedentes.trim()) return showError('Los antecedentes son obligatorios.');
+      if (!esAsistente && !campos.diagnostico.trim()) return showError('El diagnóstico es obligatorio.');
 
       estadoBoton = 'saving';
       aplicarEstadoBoton();
 
       try {
         if (esEdicion) {
-          await actualizarAtencion(id, campos);
+          if (esAsistente) await actualizarBorradorAtencion(id, campos);
+          else await actualizarAtencion(id, campos);
           estadoBoton = 'saved';
           aplicarEstadoBoton();
           location.hash = '#atenciones';
         } else {
+          if (esAsistente) {
+            const nuevo = await crearBorradorAtencion(campos);
+            location.hash = `#atenciones/editar/${nuevo.id}`;
+            return;
+          }
           await crearAtencion(campos);
           estadoBoton = 'saved';
           aplicarEstadoBoton();

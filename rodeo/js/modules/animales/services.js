@@ -132,9 +132,11 @@ export async function getAnimal(id) {
 // subir la foto, se compensa borrando el objeto huérfano -- la policy de
 // DELETE de Storage ya lo permite porque ningún `animales.foto_path` llegó
 // a referenciarlo.
-export async function crearAnimal(campos, fotoFile) {
+export async function crearAnimal(campos, fotoFile, { esAsistente = false } = {}) {
   let fotoPath = null;
-  if (fotoFile) fotoPath = await subirFotoPaciente(campos.establecimiento_actual_id, fotoFile);
+  if (fotoFile) fotoPath = await subirFotoPaciente(
+    campos.establecimiento_actual_id, fotoFile, null, { esAsistente }
+  );
 
   const { data, error } = await supabase
     .from('animales')
@@ -231,10 +233,19 @@ export function validarFoto(file) {
 // que permite subir la foto ANTES de confirmar nada, ver
 // reemplazarFotoPaciente más abajo). Devuelve el PATH (object key), nunca
 // una URL -- el bucket es privado.
-async function subirFotoPaciente(establecimientoId, file, animalId = null) {
+async function subirFotoPaciente(establecimientoId, file, animalId = null, { esAsistente = false } = {}) {
   const extCruda = (file.name.split('.').pop() || 'jpg').toLowerCase();
-  const ext = /^[a-z0-9]{1,5}$/.test(extCruda) ? extCruda : 'jpg';
-  const path = `${establecimientoId}/${animalId ? `${animalId}/` : ''}${crypto.randomUUID()}.${ext}`;
+  const ext = /^(jpg|jpeg|png|webp|heic)$/.test(extCruda) ? extCruda : 'jpg';
+  let path;
+  if (esAsistente) {
+    const { data, error } = await supabase.rpc('bit56_reservar_foto_path', {
+      p_establecimiento: establecimientoId, p_extension: ext,
+    });
+    if (error) throw error;
+    path = data;
+  } else {
+    path = `${establecimientoId}/${animalId ? `${animalId}/` : ''}${crypto.randomUUID()}.${ext}`;
+  }
 
   const { error } = await supabase.storage
     .from(BUCKET_FOTOS)

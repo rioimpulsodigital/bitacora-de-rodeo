@@ -6,10 +6,10 @@
 // lo bloquea antes de llegar al listado (mountAtencionesList), así que
 // nunca ve un link "Ver" para empezar -- esta ficha no amplía ese permiso.
 
-import { getAtencion } from './services.js';
+import { getAtencion, getValidador, validarAtencion } from './services.js';
 import { escapeHtml } from '../../dashboard.js';
 import { etiquetaPaciente } from '../../services/paciente-label.js';
-import { bloquearSiEsAjeno } from '../../services/contexto.js';
+import { bloquearSiEsAjeno, capturarContexto, contextoSigueVigente, MENSAJE_CONTEXTO_CAMBIO } from '../../services/contexto.js';
 import { puedeEditarAtencion } from '../../services/permisos.js';
 
 function toDateOnly(value) {
@@ -60,6 +60,11 @@ export async function mountAtencionDetail(contenedor, ctx, id) {
   // Mismo criterio de permiso de edición que atenciones/list.js. Regla única
   // en services/permisos.js (BIT-70).
   const puedeEditar = puedeEditarAtencion(ctx.perfil, atencion);
+  const puedeValidar = atencion.estado_validacion === 'PENDIENTE_VALIDACION'
+    && ctx.perfil.rol === 'PROFESIONAL'
+    && atencion.profesional_responsable_id === ctx.perfil.id
+    && await getValidador(atencion.establecimiento_id) === ctx.perfil.id;
+  const contextoAlMontar = capturarContexto(ctx);
 
   contenedor.innerHTML = `
     <div class="rodeo-card rodeo-ficha">
@@ -72,6 +77,7 @@ export async function mountAtencionDetail(contenedor, ctx, id) {
         ${campo('Fecha', fmt(atencion.fecha))}
         ${campo('Hora', atencion.hora?.slice(0, 5))}
         ${campo('Estado', atencion.estado === 'abierta' ? 'Abierta' : 'Cerrada')}
+        ${atencion.estado_validacion ? campo('Validación clínica', atencion.estado_validacion.replaceAll('_', ' ')) : ''}
         ${campo('Próxima visita', fmt(atencion.proxima_visita))}
         ${campo('Profesional responsable', atencion.perfiles?.nombre)}
         ${campo('Lote', atencion.lotes?.nombre, { vacio: 'Sin lote' })}
@@ -87,7 +93,22 @@ export async function mountAtencionDetail(contenedor, ctx, id) {
       ${bloqueTexto('Observaciones', atencion.observaciones)}
 
       <div class="rodeo-form-acciones" style="margin-top:16px">
+        ${puedeValidar ? '<button type="button" id="bit56-validar-atencion" class="rodeo-btn rodeo-btn-primary">Validar atención completa</button>' : ''}
         <a href="#atenciones" class="rodeo-link-btn" style="margin-left:0">Volver al listado</a>
       </div>
     </div>`;
+  const btnValidar = document.getElementById('bit56-validar-atencion');
+  if (btnValidar) btnValidar.addEventListener('click', async () => {
+    if (!contextoSigueVigente(ctx, contextoAlMontar)) {
+      btnValidar.insertAdjacentHTML('afterend', `<p class="rodeo-error">${MENSAJE_CONTEXTO_CAMBIO}</p>`);
+      return;
+    }
+    if (!confirm('¿Validar la Atención Clínica completa?')) return;
+    btnValidar.disabled = true;
+    try { await validarAtencion(id); location.hash = '#dashboard'; }
+    catch (err) {
+      btnValidar.insertAdjacentHTML('afterend', `<p class="rodeo-error">${escapeHtml(err.message)}</p>`);
+      btnValidar.disabled = false;
+    }
+  });
 }

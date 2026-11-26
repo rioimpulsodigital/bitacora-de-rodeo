@@ -1,6 +1,7 @@
 import { listAtenciones } from './services.js';
 import { escapeHtml } from '../../dashboard.js';
 import { etiquetaPaciente } from '../../services/paciente-label.js';
+import { puedeEditarAtencion } from '../../services/permisos.js';
 
 function tieneRol(perfil, rol) {
   return perfil.rol === rol;
@@ -30,11 +31,10 @@ function nombreAnimal(a) {
 export async function mountAtencionesList(contenedor, ctx) {
   contenedor.innerHTML = '<p class="rodeo-loading">Cargando…</p>';
 
-  const esAdmin = tieneRol(ctx.perfil, 'ADMINISTRADOR');
   const esProfesional = tieneRol(ctx.perfil, 'PROFESIONAL');
-  const esOperadorCampo = tieneRol(ctx.perfil, 'OPERADOR_CAMPO');
+  const esAsistente = tieneRol(ctx.perfil, 'ASISTENTE_VETERINARIO');
 
-  if (esOperadorCampo) {
+  if (!tieneRol(ctx.perfil, 'ADMINISTRADOR') && !esProfesional && !esAsistente) {
     contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">No tenés acceso a Atenciones Clínicas.</p></div>`;
     return;
   }
@@ -46,7 +46,8 @@ export async function mountAtencionesList(contenedor, ctx) {
     const hoy = new Date().toISOString().split('T')[0];
     const manana = new Date(Date.now() + 86400000).toISOString().split('T')[0];
     const conAlerta = atenciones.filter(
-      (a) => a.proxima_visita === hoy || a.proxima_visita === manana
+      (a) => (!a.estado_validacion || a.estado_validacion === 'VALIDADA')
+        && (a.proxima_visita === hoy || a.proxima_visita === manana)
     );
 
     let alertasHtml = '';
@@ -73,8 +74,7 @@ export async function mountAtencionesList(contenedor, ctx) {
     } else {
       const filas = atenciones
         .map((a) => {
-          const puedeEditar =
-            esAdmin || (esProfesional && a.profesional_responsable_id === ctx.perfil.id);
+          const puedeEditar = puedeEditarAtencion(ctx.perfil, a);
           const estadoHtml =
             a.estado === 'abierta'
               ? '<span style="color:#1a5c2a;font-weight:600">Abierta</span>'
@@ -84,7 +84,7 @@ export async function mountAtencionesList(contenedor, ctx) {
             <td>${escapeHtml(nombreAnimal(a.animales))}</td>
             <td>${escapeHtml(truncar(a.motivo))}</td>
             <td>${escapeHtml(truncar(a.diagnostico))}</td>
-            <td>${estadoHtml}</td>
+            <td>${a.estado_validacion ? escapeHtml(a.estado_validacion.replaceAll('_', ' ')) : estadoHtml}</td>
             <td>${a.proxima_visita ? fmt(a.proxima_visita) : '—'}</td>
             <td class="rodeo-table-acciones">
               <a href="#atenciones/ver/${a.id}">Ver</a>
@@ -109,7 +109,7 @@ export async function mountAtencionesList(contenedor, ctx) {
       <div class="rodeo-card">
         <div class="rodeo-view-header">
           <h2>🩺 Atenciones Clínicas</h2>
-          ${esProfesional ? '<a href="#atenciones/nueva" class="rodeo-btn">+ Nueva Atención</a>' : ''}
+          ${esProfesional || esAsistente ? `<a href="#atenciones/nueva" class="rodeo-btn">${esAsistente ? '+ Nuevo borrador' : '+ Nueva Atención'}</a>` : ''}
         </div>
         ${cuerpo}
       </div>`;

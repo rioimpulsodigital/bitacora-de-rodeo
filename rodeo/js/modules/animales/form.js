@@ -6,7 +6,7 @@ import {
 } from './services.js';
 import { SEXO_OPTS } from './labels.js';
 import { escapeHtml } from '../../dashboard.js';
-import { puedeGestionarLotes } from '../../services/permisos.js';
+import { puedeGestionarLotes, puedeEditarPaciente } from '../../services/permisos.js';
 import {
   bloquearSiEsAjeno, capturarContexto, contextoSigueVigente, MENSAJE_CONTEXTO_CAMBIO,
 } from '../../services/contexto.js';
@@ -28,7 +28,7 @@ export async function mountAnimalForm(contenedor, ctx, id) {
   // antes de persistir.
   const contextoAlMontar = capturarContexto(ctx);
 
-  if (id && ctx.perfil?.rol === 'OPERADOR_CAMPO') {
+  if (id && !puedeEditarPaciente(ctx.perfil)) {
     contenedor.innerHTML = `<div class="rodeo-card"><p class="rodeo-error">No tenés permiso para editar Pacientes existentes.</p></div>`;
     return;
   }
@@ -383,7 +383,9 @@ export async function mountAnimalForm(contenedor, ctx, id) {
         }
         location.hash = '#animales';
       } else {
-        const nuevo = await crearAnimal(campos, fotoFile);
+        const nuevo = await crearAnimal(campos, fotoFile, {
+          esAsistente: ctx.perfil.rol === 'ASISTENTE_VETERINARIO',
+        });
         if (puedeAsignarLote && loteId) await actualizarLoteDeAnimal(nuevo.id, loteId);
         const returnTo = sessionStorage.getItem('_atenciones_return');
         if (returnTo) {

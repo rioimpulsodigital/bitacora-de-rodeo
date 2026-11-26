@@ -68,7 +68,7 @@ export async function mountNovedadForm(contenedor, ctx, id) {
     const opcionesVisita = visitas
       .map(
         (v) =>
-          `<option value="${v.id}" ${novedad?.visita_id === v.id ? 'selected' : ''}>${fmtVisita(v)}</option>`
+          `<option value="${v.id}" ${novedad?.visita_id === v.id ? 'selected' : ''}>${escapeHtml(fmtVisita(v))}</option>`
       )
       .join('');
 
@@ -82,7 +82,7 @@ export async function mountNovedadForm(contenedor, ctx, id) {
     const opcionesLote = lotes
       .map(
         (l) =>
-          `<option value="${l.id}" ${novedad?.lote_id === l.id ? 'selected' : ''}>${l.nombre}</option>`
+          `<option value="${l.id}" ${novedad?.lote_id === l.id ? 'selected' : ''}>${escapeHtml(l.nombre)}</option>`
       )
       .join('');
 
@@ -115,7 +115,7 @@ export async function mountNovedadForm(contenedor, ctx, id) {
         </div>
 
         <label class="form-label">Descripción <span class="form-required">*</span></label>
-        <textarea class="form-field" name="descripcion" rows="4" required>${novedad?.descripcion ?? ''}</textarea>
+        <textarea class="form-field" name="descripcion" rows="4" required>${escapeHtml(novedad?.descripcion ?? '')}</textarea>
 
         ${puedeVerVisitas ? `<label class="form-label">Visita relacionada (opcional)</label>
         <select class="form-field" name="visita_id">
@@ -230,6 +230,6 @@ export async function mountNovedadForm(contenedor, ctx, id) {
       }
     });
   } catch (err) {
-    contenedor.innerHTML = `<p class="rodeo-error">Error al cargar el formulario: ${err.message}</p>`;
+    contenedor.innerHTML = `<p class="rodeo-error">Error al cargar el formulario: ${escapeHtml(err.message)}</p>`;
   }
 }
