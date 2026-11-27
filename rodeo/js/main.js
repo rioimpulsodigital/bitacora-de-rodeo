@@ -14,7 +14,7 @@ import {
   tieneJornadaHabilitada,
 } from './services/establecimientos.js';
 import { crearTransicionEstablecimiento } from './services/transicion-establecimiento.js';
-import { puedeAccederModulo } from './services/permisos.js';
+import { puedeAccederModulo, renderSinAccesoModulo } from './services/permisos.js';
 import { renderHeaderUsuario, renderHeaderEstablecimiento, renderSinPerfil, mountDashboard } from './dashboard.js';
 import { registerRoute, iniciarRouter } from './router.js';
 import { registrarRutasJornadas } from './modules/jornadas/index.js';
@@ -43,6 +43,10 @@ async function iniciar() {
 
   if (!perfil) {
     renderSinPerfil();
+    return;
+  }
+  if (!puedeAccederModulo(perfil, 'dashboard')) {
+    renderSinAccesoModulo(document.getElementById('rodeo-content'), 'la aplicación');
     return;
   }
 
@@ -122,6 +126,14 @@ async function iniciar() {
   registrarRutasInformes(contenedor, ctx);
   registrarRutasPapelera(contenedor, ctx);
 
+  // El rol nuevo solo accede a los cuatro destinos autorizados. Se cubren
+  // también hashes escritos a mano, además de ocultar los enlaces.
+  for (const modulo of ['jornadas', 'visitas', 'observaciones', 'catastro', 'informes', 'papelera']) {
+    if (!puedeAccederModulo(perfil, modulo)) {
+      registerRoute(modulo, () => renderSinAccesoModulo(contenedor, modulo));
+    }
+  }
+
   // Papelera: solo ADMINISTRADOR ve la entrada (la restricción real es server-side).
   if (perfil.rol === 'ADMINISTRADOR') {
     document.getElementById('rodeo-nav-papelera').style.display = '';
@@ -130,9 +142,10 @@ async function iniciar() {
   // BIT-70/F-05: navegación coherente con la matriz de roles vigente
   // (services/permisos.js). Ocultar el enlace es solo navegación: cada ruta
   // del módulo se bloquea además por hash directo y RLS es la frontera real.
-  for (const modulo of ['visitas', 'atenciones']) {
+  for (const modulo of ['jornadas', 'visitas', 'novedades', 'observaciones',
+    'animales', 'catastro', 'atenciones', 'papelera', 'informes']) {
     if (!puedeAccederModulo(perfil, modulo)) {
-      const enlace = document.querySelector(`#rodeo-sidebar [data-view="${modulo}"]`);
+      const enlace = document.querySelector(`[data-view="${modulo}"]`);
       if (enlace) enlace.style.display = 'none';
     }
   }

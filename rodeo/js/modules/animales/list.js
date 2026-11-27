@@ -1,6 +1,7 @@
 import { listAnimales } from './services.js';
 import { LABEL_ESPECIE, tituloPaciente } from './labels.js';
 import { escapeHtml } from '../../dashboard.js';
+import { puedeEditarPaciente } from '../../services/permisos.js';
 
 export async function mountAnimalesList(contenedor, ctx) {
   contenedor.innerHTML = '<p class="rodeo-loading">Cargando pacientes…</p>';
@@ -13,7 +14,7 @@ export async function mountAnimalesList(contenedor, ctx) {
     return;
   }
 
-  const puedeEditar = ctx.perfil?.rol !== 'OPERADOR_CAMPO';
+  const puedeEditar = puedeEditarPaciente(ctx.perfil);
 
   // Un Paciente puede no tener Nombre (Catastro Equino): se muestra el
   // nombre si existe, o la identificación, y la identificación como dato
@@ -43,7 +44,7 @@ export async function mountAnimalesList(contenedor, ctx) {
         <h2>Pacientes Animales</h2>
         <div style="display:flex;align-items:center;gap:10px">
           <a class="rodeo-btn" href="#animales/nuevo">+ Nuevo Paciente</a>
-          <a href="#animales/lotes" class="rodeo-link-btn">📦 Lotes</a>
+          ${ctx.perfil?.rol === 'ASISTENTE_VETERINARIO' ? '' : '<a href="#animales/lotes" class="rodeo-link-btn">📦 Lotes</a>'}
         </div>
       </div>
       ${animales.length === 0

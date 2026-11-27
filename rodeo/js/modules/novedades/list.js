@@ -1,6 +1,7 @@
 import { listNovedades, tipoLabel } from './services.js';
 import { escapeHtml } from '../../dashboard.js';
 import { etiquetaPaciente } from '../../services/paciente-label.js';
+import { puedeEditarNovedad } from '../../services/permisos.js';
 
 function fmt(isoDate) {
   if (!isoDate) return '—';
@@ -17,8 +18,6 @@ export async function mountNovedadesList(contenedor, ctx) {
   contenedor.innerHTML = '<p class="rodeo-loading">Cargando…</p>';
   try {
     const novedades = await listNovedades(ctx.establecimientoActivoId);
-    const esAdminOProfesional =
-      ctx.perfil.rol === 'ADMINISTRADOR' || ctx.perfil.rol === 'PROFESIONAL';
 
     let cuerpo = '';
     if (novedades.length === 0) {
@@ -26,11 +25,11 @@ export async function mountNovedadesList(contenedor, ctx) {
     } else {
       const filas = novedades
         .map((n) => {
-          const puedeEditar = esAdminOProfesional || n.created_by === ctx.perfil.id;
+          const puedeEditar = puedeEditarNovedad(ctx.perfil, n);
           const paciente = n.animales
             ? escapeHtml(etiquetaPaciente(n.animales))
             : n.lotes?.nombre
-            ? `Lote: ${n.lotes.nombre}`
+            ? `Lote: ${escapeHtml(n.lotes.nombre)}`
             : '—';
           const lluviaHtml =
             n.tipo === 'clima' && n.precipitacion_mm !== null
@@ -38,8 +37,8 @@ export async function mountNovedadesList(contenedor, ctx) {
               : '';
           return `<tr>
             <td>${fmt(n.fecha)}</td>
-            <td>${tipoLabel(n.tipo)}${lluviaHtml}</td>
-            <td>${truncar(n.descripcion)}</td>
+            <td>${escapeHtml(tipoLabel(n.tipo))}${lluviaHtml}</td>
+            <td>${escapeHtml(truncar(n.descripcion))}</td>
             <td>${paciente}</td>
             <td class="rodeo-table-acciones">
               <a href="#novedades/ver/${n.id}">Ver</a>
@@ -61,7 +60,7 @@ export async function mountNovedadesList(contenedor, ctx) {
 
     const mensaje = sessionStorage.getItem('_novedades_msg');
     if (mensaje) sessionStorage.removeItem('_novedades_msg');
-    const mensajeHtml = mensaje ? `<div class="rodeo-msg-ok">${mensaje}</div>` : '';
+    const mensajeHtml = mensaje ? `<div class="rodeo-msg-ok">${escapeHtml(mensaje)}</div>` : '';
 
     contenedor.innerHTML = `
       <div class="rodeo-card">
@@ -73,6 +72,6 @@ export async function mountNovedadesList(contenedor, ctx) {
         ${cuerpo}
       </div>`;
   } catch (err) {
-    contenedor.innerHTML = `<p class="rodeo-error">Error al cargar novedades: ${err.message}</p>`;
+    contenedor.innerHTML = `<p class="rodeo-error">Error al cargar novedades: ${escapeHtml(err.message)}</p>`;
   }
 }

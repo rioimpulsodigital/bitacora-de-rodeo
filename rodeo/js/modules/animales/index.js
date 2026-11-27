@@ -7,6 +7,7 @@ import { mountAnimalForm } from './form.js';
 import { mountAnimalDetail } from './detail.js';
 import { mountLotesList } from './lotes-list.js';
 import { mountLoteForm } from './lotes-form.js';
+import { puedeGestionarLotes, renderSinAccesoModulo } from '../../services/permisos.js';
 
 // Lotes vive bajo #animales/lotes/... para que el ítem "Pacientes" del
 // sidebar permanezca activo al navegar dentro del módulo.
@@ -17,6 +18,10 @@ import { mountLoteForm } from './lotes-form.js';
 export function registrarRutasAnimales(contenedor, ctx) {
   registerRoute('animales', (partes) => {
     if (partes[0] === 'lotes') {
+      if (!puedeGestionarLotes(ctx.perfil)) {
+        renderSinAccesoModulo(contenedor, 'Lotes');
+        return;
+      }
       if (partes[1] === 'nuevo') mountLoteForm(contenedor, ctx, null);
       else if (partes[1] === 'editar') mountLoteForm(contenedor, ctx, partes[2]);
       else mountLotesList(contenedor, ctx);
