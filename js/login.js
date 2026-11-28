@@ -1,7 +1,7 @@
 // Lógica de la pantalla de Login. No conoce nada del shell de la
 // app (js/core/app.js) — su único trabajo es autenticar y redirigir.
 
-import { getSession, signIn } from './core/auth.js';
+import { getSession, signIn, requestPasswordReset } from './core/auth.js';
 
 const form = document.getElementById('login-form');
 const emailEl = document.getElementById('login-email');
@@ -58,4 +58,17 @@ form.addEventListener('submit', async (e) => {
   }
 
   location.replace('index.html');
+});
+
+// BIT-75: recuperación de contraseña. Respuesta idéntica exista o no la cuenta (no revela usuarios).
+const infoEl = document.getElementById('login-info');
+function mostrarInfo(m) { infoEl.textContent = m; infoEl.classList.add('visible'); }
+if (new URLSearchParams(location.search).get('clave') === 'ok') mostrarInfo('Contraseña guardada. Ya podés ingresar.');
+document.getElementById('login-olvide').addEventListener('click', async (e) => {
+  e.preventDefault();
+  clearError();
+  const email = emailEl.value.trim();
+  if (!email.includes('@')) { showError('Ingresá tu email y volvé a tocar «Olvidé mi contraseña».'); return; }
+  await requestPasswordReset(email, new URL('restablecer.html', location.href).href);
+  mostrarInfo('Si el email corresponde a una cuenta activa, te enviamos un correo para elegir una contraseña nueva.');
 });

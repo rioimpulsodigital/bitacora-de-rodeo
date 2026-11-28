@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="no-referrer">
+  <title>Elegir contraseña — Bitácora de Rodeo</title>
+  <link rel="icon" type="image/png" href="img/branding/BIT-favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/login.css">
+</head>
+<body class="login-body">
+  <div class="login-card">
+    <img class="login-logo" src="img/branding/BIT-logo-isotipo-transparente.png" alt="Bitácora de Rodeo">
+    <div class="login-appname">Elegí tu contraseña</div>
+
+    <p id="rest-estado" class="form-label">Verificando el enlace…</p>
+
+    <form id="rest-form" novalidate style="display:none">
+      <label class="form-label" for="rest-pass">Contraseña nueva</label>
+      <input class="form-field" type="password" id="rest-pass" autocomplete="new-password" required minlength="10">
+      <label class="form-label" for="rest-pass2">Repetí la contraseña</label>
+      <input class="form-field" type="password" id="rest-pass2" autocomplete="new-password" required minlength="10">
+      <p class="form-label" style="font-weight:400">Mínimo 10 caracteres.</p>
+      <div class="login-error" id="rest-error" role="alert"></div>
+      <button type="submit" class="salida-btn" id="rest-submit">Guardar contraseña</button>
+    </form>
+
+    <p style="margin-top:16px"><a id="rest-volver" href="login.html">Volver a ingresar</a></p>
+  </div>
+  <script type="module" src="js/restablecer.js"></script>
+</body>
+</html>

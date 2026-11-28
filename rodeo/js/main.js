@@ -14,7 +14,7 @@ import {
   tieneJornadaHabilitada,
 } from './services/establecimientos.js';
 import { crearTransicionEstablecimiento } from './services/transicion-establecimiento.js';
-import { puedeAccederModulo, renderSinAccesoModulo } from './services/permisos.js';
+import { puedeAccederModulo, perfilActivo, renderSinAccesoModulo } from './services/permisos.js';
 import { renderHeaderUsuario, renderHeaderEstablecimiento, renderSinPerfil, mountDashboard } from './dashboard.js';
 import { registerRoute, iniciarRouter } from './router.js';
 import { registrarRutasJornadas } from './modules/jornadas/index.js';
@@ -25,6 +25,7 @@ import { registrarRutasObservaciones } from './modules/observaciones/index.js';
 import { registrarRutasNovedades } from './modules/novedades/index.js';
 import { registrarRutasAtenciones } from './modules/atenciones/index.js';
 import { registrarRutasPapelera } from './modules/papelera/index.js';
+import { registrarRutasUsuarios } from './modules/usuarios/index.js';
 import { registrarRutasInformes } from './modules/informes/index.js';
 
 async function handleSignOut() {
@@ -43,6 +44,13 @@ async function iniciar() {
 
   if (!perfil) {
     renderSinPerfil();
+    return;
+  }
+  if (!perfilActivo(perfil)) {
+    document.getElementById('rodeo-content').innerHTML =
+      '<div class="rodeo-card"><h2>Cuenta inactiva</h2><p class="rodeo-error">Tu cuenta está inactiva. Contactá a un administrador.</p>' +
+      '<button type="button" id="rodeo-inactivo-salir" class="rodeo-btn">Cerrar sesión</button></div>';
+    document.getElementById('rodeo-inactivo-salir').addEventListener('click', handleSignOut);
     return;
   }
   if (!puedeAccederModulo(perfil, 'dashboard')) {
@@ -125,10 +133,11 @@ async function iniciar() {
   registrarRutasAtenciones(contenedor, ctx);
   registrarRutasInformes(contenedor, ctx);
   registrarRutasPapelera(contenedor, ctx);
+  registrarRutasUsuarios(contenedor, ctx);
 
   // El rol nuevo solo accede a los cuatro destinos autorizados. Se cubren
   // también hashes escritos a mano, además de ocultar los enlaces.
-  for (const modulo of ['jornadas', 'visitas', 'observaciones', 'catastro', 'informes', 'papelera']) {
+  for (const modulo of ['jornadas', 'visitas', 'observaciones', 'catastro', 'informes', 'papelera', 'usuarios']) {
     if (!puedeAccederModulo(perfil, modulo)) {
       registerRoute(modulo, () => renderSinAccesoModulo(contenedor, modulo));
     }
@@ -137,13 +146,14 @@ async function iniciar() {
   // Papelera: solo ADMINISTRADOR ve la entrada (la restricción real es server-side).
   if (perfil.rol === 'ADMINISTRADOR') {
     document.getElementById('rodeo-nav-papelera').style.display = '';
+    document.getElementById('rodeo-nav-usuarios').style.display = '';
   }
 
   // BIT-70/F-05: navegación coherente con la matriz de roles vigente
   // (services/permisos.js). Ocultar el enlace es solo navegación: cada ruta
   // del módulo se bloquea además por hash directo y RLS es la frontera real.
   for (const modulo of ['jornadas', 'visitas', 'novedades', 'observaciones',
-    'animales', 'catastro', 'atenciones', 'papelera', 'informes']) {
+    'animales', 'catastro', 'atenciones', 'papelera', 'informes', 'usuarios']) {
     if (!puedeAccederModulo(perfil, modulo)) {
       const enlace = document.querySelector(`[data-view="${modulo}"]`);
       if (enlace) enlace.style.display = 'none';

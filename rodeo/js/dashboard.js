@@ -20,6 +20,7 @@ export function renderHeaderUsuario(perfil, onSignOut) {
   el.innerHTML = `
     <span>${escapeHtml(perfil.nombre)}</span>
     <span class="rol-badge">${escapeHtml(perfil.rol)}</span>
+    <a href="../restablecer.html?modo=cambio" id="rodeo-cambiar-clave" style="font-size:12px;margin-right:8px">Cambiar contraseña</a>
     <button type="button" id="rodeo-logout">Cerrar sesión</button>
   `;
   document.getElementById('rodeo-logout').addEventListener('click', onSignOut);

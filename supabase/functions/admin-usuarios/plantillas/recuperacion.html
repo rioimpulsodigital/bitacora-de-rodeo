@@ -1,0 +1,9 @@
+<!-- BIT-75: plantilla de Supabase Auth «Reset Password» (Authentication → Email Templates), en español.
+     Se usa tanto para el primer acceso (alta por el ADMINISTRADOR) como para recuperar la contraseña.
+     Asunto sugerido: Elegí tu contraseña — Bitácora de Rodeo
+     NO incluye contraseñas: la persona la elige al abrir el enlace. Cambiar esta plantilla es configuración de Auth (requiere autorización). -->
+<h2>Bitácora de Rodeo</h2>
+<p>Hola. Recibiste este correo porque se creó tu acceso a Bitácora de Rodeo, o porque pediste recuperar tu contraseña.</p>
+<p><a href="{{ .ConfirmationURL }}">Elegir mi contraseña</a></p>
+<p>El enlace es personal, se puede usar una sola vez y vence en poco tiempo. Si venció, entrá a la pantalla de ingreso y tocá «Olvidé mi contraseña», o pedile a un administrador que te reenvíe el acceso.</p>
+<p>Si no esperabas este correo, ignoralo: no se hará ningún cambio.</p>

@@ -37,3 +37,13 @@ export async function requireSession(loginUrl) {
   });
   return session;
 }
+
+// BIT-75: recuperación y cambio de contraseña. La credencial la elige SIEMPRE la propia persona;
+// ni el administrador ni la app la conocen.
+export function requestPasswordReset(email, redirectTo) {
+  return supabase.auth.resetPasswordForEmail(email, { redirectTo });
+}
+
+export function updatePassword(password) {
+  return supabase.auth.updateUser({ password });
+}
