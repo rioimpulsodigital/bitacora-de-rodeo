@@ -8,15 +8,22 @@
 //  - Visitas: OPERADOR_CAMPO no ve el módulo, ni crea ni edita (15 Sep 2026).
 //  - Atenciones Clínicas: OPERADOR_CAMPO sin acceso clínico (13 Ago 2026).
 const MODULOS = new Set(['dashboard', 'jornadas', 'visitas', 'novedades',
-  'observaciones', 'animales', 'catastro', 'atenciones', 'informes', 'papelera']);
+  'observaciones', 'animales', 'catastro', 'atenciones', 'informes', 'papelera', 'usuarios']);
 const ROLES_EXISTENTES = new Set(['ADMINISTRADOR', 'PROFESIONAL', 'OPERADOR_CAMPO']);
 const MODULOS_ASISTENTE = new Set(['dashboard', 'novedades', 'animales', 'atenciones']);
 
+// BIT-75/BIT-56-46: un perfil inactivo (o sin el campo) no accede a ningún módulo: falla cerrado.
+// Es solo UI; RLS/RPC ya contienen al usuario inactivo en el servidor.
+export function perfilActivo(perfil) {
+  return perfil?.activo === true;
+}
+
 export function puedeAccederModulo(perfil, modulo) {
+  if (!perfilActivo(perfil)) return false;
   if (!MODULOS.has(modulo)) return false;
   if (perfil?.rol === 'ASISTENTE_VETERINARIO') return MODULOS_ASISTENTE.has(modulo);
   if (!ROLES_EXISTENTES.has(perfil?.rol)) return false;
-  if (modulo === 'papelera') return perfil.rol === 'ADMINISTRADOR';
+  if (modulo === 'papelera' || modulo === 'usuarios') return perfil.rol === 'ADMINISTRADOR';
   return perfil.rol !== 'OPERADOR_CAMPO' || !['visitas', 'atenciones'].includes(modulo);
 }
 
